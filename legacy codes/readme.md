@@ -1,0 +1,1 @@
+These are the iterations of the code that I originally made before I really learned to use github. While the files themselves are outdated, I may occasionally go back for some old functions that I made before so I don't have to work entirely from scratch 
