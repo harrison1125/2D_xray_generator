@@ -1,66 +1,99 @@
 # crystal.py
 import numpy as np
-import math
+from scipy.spatial.transform import Rotation as R
 
 
 class Grain:
-    """Defines a grain with properties for XRD simulation."""
+    def __init__(self, lattice_parameters, orientation=None):
+        """
+        Represents a single grain in a polycrystalline material.
 
-    def __init__(
-        self,
-        size_avg,
-        size_var,
-        strain_avg,
-        strain_var,
-        aspect_ratio,
-        lattice_param,
-        experiment,
-    ):
-        self.size_avg = size_avg
-        self.size_var = size_var
-        self.strain_avg = strain_avg
-        self.strain_var = strain_var
-        self.aspect_ratio = aspect_ratio
-        self.lattice_param = lattice_param
-        self.experiment = experiment
-        self._initialize_reciprocal_lattice()
+        :param lattice_parameters: Tuple containing the lattice constants (a, b, c, α, β, γ)
+        :param orientation: 3x3 rotation matrix or Euler angles defining grain orientation
+        """
+        self.lattice_parameters = lattice_parameters
 
-    def _initialize_reciprocal_lattice(self):
+        # If no orientation is provided, set a random orientation
+        if orientation is None:
+            self.orientation = R.random().as_matrix()
+        elif isinstance(orientation, (list, np.ndarray)) and len(orientation) == 3:
+            self.orientation = R.from_euler(
+                "xyz", orientation, degrees=True
+            ).as_matrix()
+        else:
+            self.orientation = np.array(orientation)
+
+    def rotate_vector(self, vector):
+        """Apply the grain's orientation to a given vector."""
+        return self.orientation @ np.array(vector)
+
+    def get_reciprocal_lattice_vectors(self):
         """Computes reciprocal lattice vectors based on lattice parameters."""
-        sphere_range = math.floor(1 / self.experiment.wavelength)
-        self.hkl_indices = [
-            (h, k, l)
-            for h in range(-sphere_range, sphere_range + 1)
-            for k in range(-sphere_range, sphere_range + 1)
-            for l in range(-sphere_range, sphere_range + 1)
-        ]
-        self.reciprocal_lattice_vectors = np.array(
-            [
-                (h / self.lattice_param, k / self.lattice_param, l / self.lattice_param)
-                for h, k, l in self.hkl_indices
-            ]
+        a, b, c, alpha, beta, gamma = self.lattice_parameters
+
+        # Convert angles to radians
+        alpha, beta, gamma = np.radians([alpha, beta, gamma])
+
+        # Compute unit cell volume
+        volume = (
+            a
+            * b
+            * c
+            * np.sqrt(
+                1
+                - np.cos(alpha) ** 2
+                - np.cos(beta) ** 2
+                - np.cos(gamma) ** 2
+                + 2 * np.cos(alpha) * np.cos(beta) * np.cos(gamma)
+            )
         )
 
-    def randomize_properties(self):
-        """Randomizes grain size, strain, and rotation."""
-        self.size = np.random.normal(self.size_avg, np.sqrt(self.size_var))
-        self.strain = np.random.normal(self.strain_avg, np.sqrt(self.strain_var))
-        self._rotate_reciprocal_lattice()
-
-    def _rotate_reciprocal_lattice(self):
-        """Applies a random rotation to the reciprocal lattice vectors."""
-        theta = np.radians(np.random.uniform(0, 360))
-        phi = np.radians(np.random.uniform(0, 360))
-
-        Rz = np.array(
-            [
-                [np.cos(theta), -np.sin(theta), 0],
-                [np.sin(theta), np.cos(theta), 0],
-                [0, 0, 1],
-            ]
+        # Compute reciprocal lattice vectors
+        b1 = (
+            np.cross(
+                [b * np.cos(gamma), b * np.sin(gamma), 0],
+                [c * np.cos(beta), 0, c * np.sin(beta)],
+            )
+            / volume
         )
-        Rx = np.array(
-            [[1, 0, 0], [0, np.cos(phi), -np.sin(phi)], [0, np.sin(phi), np.cos(phi)]]
-        )
-        R = Rx @ Rz
-        self.reciprocal_lattice_vectors = self.reciprocal_lattice_vectors @ R.T
+        b2 = np.cross([c * np.cos(beta), 0, c * np.sin(beta)], [a, 0, 0]) / volume
+        b3 = np.cross([a, 0, 0], [b * np.cos(gamma), b * np.sin(gamma), 0]) / volume
+
+        return np.array([b1, b2, b3])
+
+    def get_diffraction_spots(self, wavelength):
+        """
+        Simulates diffraction spots based on the reciprocal lattice and orientation.
+
+        :param wavelength: X-ray wavelength (in same units as lattice parameters)
+        :return: List of scattered wave vectors representing diffraction events
+        """
+        reciprocal_lattice = self.get_reciprocal_lattice_vectors()
+        diffraction_spots = []
+
+        # Consider basic Miller indices (hkl) within a range
+        for h in range(-2, 3):
+            for k in range(-2, 3):
+                for l in range(-2, 3):
+                    if (h, k, l) == (0, 0, 0):
+                        continue  # Skip origin
+
+                    # Compute reciprocal lattice vector for (hkl)
+                    g_hkl = (
+                        h * reciprocal_lattice[0]
+                        + k * reciprocal_lattice[1]
+                        + l * reciprocal_lattice[2]
+                    )
+
+                    # Apply orientation
+                    g_rotated = self.rotate_vector(g_hkl)
+
+                    # Compute diffraction condition
+                    theta = np.arcsin(
+                        np.linalg.norm(g_rotated) * wavelength / (4 * np.pi)
+                    )
+
+                    if np.isfinite(theta):  # Valid Bragg condition
+                        diffraction_spots.append(g_rotated)
+
+        return diffraction_spots
