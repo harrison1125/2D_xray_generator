@@ -1,7 +1,7 @@
 # 2D_xray_generator
 This branch is the beginning of the refactoring and migration from a notebook to a real python code. 
 
-Here are some thoughts on the original code and the outling for proposed restructuring:
+Here are David's thoughts on the original code and the outling for proposed restructuring:
 
 1. There is a redundant import of StuctureFactors that can be cleaned up.
 2. I think the divisions between classes could be more sensible: 
