@@ -35,7 +35,7 @@
       "metadata": {},
       "source": [
        "## Step 2: Implement Diffraction Calculations\n",
-       "Using Bragg's Law: $n lambda = 2d sin\theta$"]
+       "Using Bragg's Law: $nlambda = 2dsin\theta$"]
      },
      {
       "cell_type": "code",
