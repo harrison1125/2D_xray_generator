@@ -1,4 +1,4 @@
-# VSCode Setup Documentation
+# VSCode Setup and Edits Documentation
 ### Homebrew for package management on Mac
 - /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 - sota password is just your computer password (ubuntu system)
