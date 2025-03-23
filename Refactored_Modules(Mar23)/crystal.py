@@ -61,6 +61,8 @@ class Grain:
 
         return np.array([b1, b2, b3])
 
+#This part of the code underneath is a little concerning for me (Harrison) right now. I am worried that it overlaps with the function fulfilled by the filter_points function under ewald. My main concerin is how the basic miller indices are considered - why (-2, 3) instead of being bound by an ewald limiting sphere, as well as deviations from values that are exactly the same for small angular shifts that necessarily might fulfill diffraction conditions by glancing off reciprocal lattice points with the ewald sphere rather than being dead on. 
+'''
     def get_diffraction_spots(self, wavelength):
         """
         Simulates diffraction spots based on the reciprocal lattice and orientation.
@@ -97,3 +99,4 @@ class Grain:
                         diffraction_spots.append(g_rotated)
 
         return diffraction_spots
+'''

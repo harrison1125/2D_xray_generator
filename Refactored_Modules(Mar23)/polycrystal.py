@@ -1,6 +1,7 @@
 import numpy as np
 from crystal import Grain  # Import Grain class
 
+'''Consider switching this into some controllable parameters on Dream3D later'''
 
 class Polycrystal:
     def __init__(self, num_grains, lattice_parameters):
