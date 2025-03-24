@@ -1,6 +1,16 @@
-# detector.py
+#!/Users/hpark108/miniconda3/envs/hexrdgui/bin/python
+
 import numpy as np
-import math
+import math 
+
+class Experiment:
+    """Handles experimental conditions such as wavelength and sample."""
+
+    def __init__(self, wavelength: float, sample: str):
+        self.wavelength = wavelength
+        self.sample = sample
+        self.inv_lambda = 1 / wavelength
+
 
 class Detector:
     '''
@@ -68,3 +78,4 @@ class Detector:
             "coordinate": np.array(self.projected_points),
             "two_theta": np.array(self.two_theta)
         }
+

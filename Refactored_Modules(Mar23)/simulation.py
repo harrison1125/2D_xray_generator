@@ -1,6 +1,7 @@
 # simulation.py
 import numpy as np
 import matplotlib.pyplot as plt
+import math
 from experiment import Experiment, Detector
 from crystal import Grain
 from ewald import EwaldSphere
@@ -13,12 +14,12 @@ def run_simulation(num_grains):
 
     for _ in range(num_grains):
         grain = Grain(
-            size_avg=33500,
-            size_var=33062500,
-            strain_avg=0,
-            strain_var=0,
+            size_average=33500,
+            size_variance=33062500,
+            strain_average=0,
+            strain_variance=0,
             aspect_ratio=1.5,
-            lattice_param=0.361,
+            lattice_parameter=0.361,
             experiment=experiment,
         )
         grain.randomize_properties()
@@ -40,6 +41,8 @@ def plot_results(projected_points):
         plt.scatter(x_coords, y_coords, c="orange", s=3, label="Projected Points")
         plt.xlabel("Detector Width (mm)")
         plt.ylabel("Detector Height (mm)")
+        plt.xlim(-(detector.width)/2,(detector.width/2))
+        plt.ylim(-(detector.height)/2,(detector.height/2))
         plt.legend()
         plt.grid(True)
         plt.show()

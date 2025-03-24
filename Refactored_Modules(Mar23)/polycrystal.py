@@ -1,6 +1,7 @@
 import numpy as np
 from crystal import Grain  # Import Grain class
 
+'''Consider switching this into some controllable parameters on Dream3D later'''
 
 class Polycrystal:
     def __init__(self, num_grains, lattice_parameters):
@@ -13,6 +14,9 @@ class Polycrystal:
         self.num_grains = num_grains
         self.lattice_parameters = lattice_parameters
         self.grains = [Grain(lattice_parameters) for _ in range(num_grains)]
+
+
+    #run the same function again for as many materials as there are crystal types 
 
     def get_combined_diffraction_pattern(self, wavelength):
         """
