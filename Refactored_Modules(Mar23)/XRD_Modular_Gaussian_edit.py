@@ -5,12 +5,12 @@ import seaborn as sns
 import math
 
 # Import the modularized classes
-from experiment_module import Experiment
-from sample_module import Sample
-from grain_module import Grain
-from e_sphere_module import EwaldSphere
-from detector_module import Detector  # EDIT: This is the updated Detector
-from gauss_param import fwhm_to_sigma, bivariate_gaussian
+from experiment import Experiment
+from sample import Sample
+from crystal import Grain
+from ewald import EwaldSphere
+from experiment import Experiment, Detector  # EDIT: This is the updated Detector
+from broadening_related.gauss_param import fwhm_to_sigma, bivariate_gaussian
 
 import StructureFactors  # For structure factor computations
 

@@ -3,15 +3,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import math
+from sample_module import sample
 
 # Import the modularized classes.
 from experiment_module import Experiment
-from sample_module import Sample
 from grain_module import Grain
 from e_sphere_module import EwaldSphere
 from detector_module import Detector
-from broadening_related.gauss_param import fwhm_to_sigma, bivariate_gaussian
-
+from gauss_param import fwhm_to_sigma, bivariate_gaussian
 
 import StructureFactors  # Your external module for structure factors
 

@@ -41,6 +41,8 @@ def plot_results(projected_points):
         plt.scatter(x_coords, y_coords, c="orange", s=3, label="Projected Points")
         plt.xlabel("Detector Width (mm)")
         plt.ylabel("Detector Height (mm)")
+        plt.xlim(-(detector.width)/2,(detector.width/2))
+        plt.ylim(-(detector.height)/2,(detector.height/2))
         plt.legend()
         plt.grid(True)
         plt.show()
