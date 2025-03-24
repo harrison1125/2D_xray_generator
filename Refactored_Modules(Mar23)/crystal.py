@@ -83,7 +83,7 @@ class Grain:
         self.randomize_grain_strain
         self.randomize_rotation
 
-#Below is a grain that can be used for creating non-cubic reciprocal lattices
+#Below is a grain that can be used for creating non-cubic reciprocal lattices. Consider implementing later
 # class Grain:
 #     def __init__(self, lattice_parameters, orientation=None):
 #         """

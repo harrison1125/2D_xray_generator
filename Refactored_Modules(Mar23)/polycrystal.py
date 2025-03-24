@@ -15,6 +15,9 @@ class Polycrystal:
         self.lattice_parameters = lattice_parameters
         self.grains = [Grain(lattice_parameters) for _ in range(num_grains)]
 
+
+    #run the same function again for as many materials as there are crystal types 
+
     def get_combined_diffraction_pattern(self, wavelength):
         """
         Simulates the combined diffraction pattern of all grains.
