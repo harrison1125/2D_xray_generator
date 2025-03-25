@@ -1,1 +1,25 @@
-Modular code created by David Elbert (early draft). 
+Source code. 
+
+Material.py
+	Holds information about materials, such as their lattice parameters, atomic form factors, etc
+
+Experiment.py
+	holds all general information about the experiment in a way that is easily programmable for future iterating 
+
+Crystal.py
+	Crystal structure and associated reciprocal lattice information 
+	Has the ability to generate a grain with a randomized size, strain, and orientation. 
+
+Ewald
+	Receives grain data. Projects points onto the detector. Calculates those points’ 2theta, and sends information about the grain to the detector. 
+	
+
+Detector.py
+	Receives data from Ewald and projects it onto the detector. 
+
+Experimental broadening.py
+	Looks at all information on the detector and creates Gaussian distributions at those spots
+
+Instrumental broadening.py
+	Applies a general broadening to all points. 
+	[Currently named “point on detector]]
