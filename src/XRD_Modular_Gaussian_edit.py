@@ -5,12 +5,12 @@ import seaborn as sns
 import math
 
 # Import the modularized classes
-from experiment import Experiment
-from sample import Sample
-from crystal import Grain
-from ewald import EwaldSphere
-from experiment import Experiment, Detector  # EDIT: This is the updated Detector
-from broadening_related.gauss_param import fwhm_to_sigma, bivariate_gaussian
+from experiment_module import Experiment
+from sample_module import Sample
+from grain_module import Grain
+from e_sphere_module import EwaldSphere
+from detector_module import Detector  # EDIT: This is the updated Detector
+from gauss_param import fwhm_to_sigma, bivariate_gaussian
 
 import StructureFactors  # For structure factor computations
 
@@ -72,29 +72,94 @@ grain = Grain(
     experiment=exp
 )
 
-# ADDED: We will accumulate the projected coordinates AND sum a composite detector image
+# Initialize the composite image and coordinates
 coords_on_detector = []
-# ADDED: Initialize a composite image the same size as the detector
 composite_image = np.zeros((1000, 1000))
 
-for _ in range(num_grains):
+
+first_grain = Grain(
+    size_average=33500, 
+    size_variance=33062500, 
+    strain_average=0, 
+    strain_variance=0, 
+    aspect_ratio=1.5, 
+    lattice_parameter=0.361, 
+    experiment=exp
+)
+first_grain.randomize_rotation()
+first_grain.randomize_grain_size()
+first_grain.randomize_grain_strain()
+initial_ewald = EwaldSphere(first_grain, exp, tolerance=0.03)
+
+detector = Detector(initial_ewald, exp, detector_width=1000, detector_height=1000, detector_distance=300)
+
+for grain_index in range(num_grains):
     grain.randomize_rotation()
     grain.randomize_grain_size()
     grain.randomize_grain_strain()
 
     ewald = EwaldSphere(grain, exp, tolerance=0.03)
-    # ADDED: Use the updated Detector that produces Gaussian spots
-    detector = Detector(ewald, exp, detector_width=1000, detector_height=1000, detector_distance=300)
-    projected_points = detector.project_points()
+    detector.ewald_sphere = ewald  # update the Ewald sphere for the current grain
+    projected_points = detector.project_points()  # This updates detector.image
+
+    # Debugging: Print the sum of the grain-specific image
+    # print(f"Grain {grain_index + 1}: Grain Image Sum = {np.sum(projected_points['image'])}")
 
     # Collect the raw (x, y, z) coordinates for a scatter plot if desired
     coords_on_detector.extend(projected_points["coordinate"])
-    # ADDED: Accumulate the Gaussian intensities from each grain into composite_image
+
+    # Accumulate the Gaussian intensities from each grain into composite_image
     composite_image += projected_points["image"]
 
-coords_on_detector = np.array(coords_on_detector)
+    # Debugging: Print the composite image sum after each grain
+    # print(f"Composite Image Sum After Grain {grain_index + 1}: {np.sum(composite_image)}")
 
-# Plot the raw projected points (optional)
+# Convert coordinates to a NumPy array after the loop
+coords_on_detector = np.array(coords_on_detector)
+#plt.imshow(composite_image_normalized, cmap='hot', origin='lower', extent=[-500, 500, -500, 500])
+
+# --- Block the central spot using Option 1: Completely block it ---
+# Define the blocker FWHM (in pixels) based on the central spot's size (adjust as needed)
+blocker_fwhm = 35.0 
+blocker_radius = blocker_fwhm / 2.0
+
+# Determine the center of the composite image
+center_row = composite_image.shape[0] // 2
+center_col = composite_image.shape[1] // 2
+
+# Create a grid of indices corresponding to each pixel
+yy, xx = np.indices(composite_image.shape)
+
+# Compute the distance of each pixel from the center
+distance_from_center = np.sqrt((xx - center_col)**2 + (yy - center_row)**2)
+
+# Create a binary mask: True for pixels outside the blocker region, False inside
+mask = distance_from_center > blocker_radius
+
+# Option 1: Completely block the center (set intensities to zero)
+composite_image_blocked = composite_image.copy()
+composite_image_blocked[~mask] = 0
+
+# Plot the final composite detector image
+plt.figure(figsize=(8, 8))
+plt.imshow(np.log1p(composite_image_blocked), cmap='hot', origin='lower', extent=[-500, 500, -500, 500])
+plt.xlabel("Detector Width (mm)")
+plt.ylabel("Detector Height (mm)")
+plt.title("Final Composite Detector Image with Gaussian Distributed Spots")
+plt.colorbar(label='Intensity')
+plt.show()
+
+'''
+# Plot the example 2D Gaussian heatmap (unchanged)
+plt.figure(figsize=(fig_width, fig_height), dpi=dpi)
+sns.heatmap(Z, xticklabels=False, yticklabels=False, cmap='viridis')
+plt.title("2D Gaussian: Grain Size, Two Theta, etc.")
+plt.xlabel("X")
+plt.ylabel("Y")
+plt.show()
+'''
+
+'''
 if coords_on_detector.size > 0:
     x_coords = coords_on_detector[:, 1]
     y_coords = coords_on_detector[:, 2]
@@ -111,25 +176,5 @@ if coords_on_detector.size > 0:
     plt.show()
 else:
     print("No projected points to display.")
+'''
 
-filtered_points = ewald.filter_points()
-print("Number of reflections in this grain:", len(filtered_points))
-
-# ADDED: Plot the composite detector image with Gaussian-distributed spots
-plt.figure(figsize=(8, 8))
-# 'origin=lower' to put (0,0) at bottom-left, 'extent' maps pixel coords to physical mm
-plt.imshow(composite_image, cmap='hot', origin='lower',
-           extent=[-500, 500, -500, 500])
-plt.xlabel("Detector Width (mm)")
-plt.ylabel("Detector Height (mm)")
-plt.title("Detector Image with Gaussian Distributed Spots")
-plt.colorbar(label='Intensity')
-plt.show()
-
-# Plot the example 2D Gaussian heatmap (unchanged)
-plt.figure(figsize=(fig_width, fig_height), dpi=dpi)
-sns.heatmap(Z, xticklabels=False, yticklabels=False, cmap='viridis')
-plt.title("2D Gaussian: Grain Size, Two Theta, etc.")
-plt.xlabel("X")
-plt.ylabel("Y")
-plt.show()
