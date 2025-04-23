@@ -98,12 +98,19 @@ for grain_index in range(num_grains):
     grain.randomize_grain_size()
     grain.randomize_grain_strain()
 
+<<<<<<< Updated upstream
     ewald = EwaldSphere(grain, exp, tolerance=0.03)
     detector.ewald_sphere = ewald  # update the Ewald sphere for the current grain
     projected_points = detector.project_points()  # This updates detector.image
 
     # Debugging: Print the sum of the grain-specific image
     # print(f"Grain {grain_index + 1}: Grain Image Sum = {np.sum(projected_points['image'])}")
+=======
+    ewald = EwaldSphere(grain, exp, tolerance=0.01)
+    # ADDED: Use the updated Detector that produces Gaussian spots
+    detector = Detector(ewald, exp, detector_width=1000, detector_height=1000, detector_distance=300)
+    projected_points = detector.project_points()
+>>>>>>> Stashed changes
 
     # Collect the raw (x, y, z) coordinates for a scatter plot if desired
     coords_on_detector.extend(projected_points["coordinate"])

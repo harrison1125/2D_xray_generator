@@ -5,11 +5,11 @@ import seaborn as sns
 import math
 
 # Import the modularized classes.
-from experiment_module import Experiment
-from sample_module import Sample
-from grain_module import Grain
-from e_sphere_module import EwaldSphere
-from detector_module import Detector
+from experiment import Experiment
+from sample import Sample
+from crystal import Grain
+from ewald import EwaldSphere
+from experiment import Detector
 from broadening_related.gauss_param import fwhm_to_sigma, bivariate_gaussian
 
 
@@ -73,7 +73,7 @@ for _ in range(num_grains):
     grain.randomize_grain_size()
     grain.randomize_grain_strain()
     
-    ewald = EwaldSphere(grain, exp, tolerance=0.03)
+    ewald = EwaldSphere(grain, exp, tolerance=0.01)
     filtered_points = ewald.filter_points()
     
     detector = Detector(ewald, exp, detector_width=1000, detector_height=1000, detector_distance=300)
