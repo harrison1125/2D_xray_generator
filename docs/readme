@@ -1,1 +1,13 @@
-Start adding documentation, particularly figure-worthy images or videos or animations or scripts here. Will make it easier to reach when I need to publish anything
+# 2D_X-ray_Generator
+
+This project is an X-ray generator made for creating patterns for training machine-learning models. 
+
+# Features
+Physics-informed XRD generation 
+Confocal beam calculation
+Noise inclusion
+
+# Dependencies 
+Numpy
+Seaborn
+Matplotlib

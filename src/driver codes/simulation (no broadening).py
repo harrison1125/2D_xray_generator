@@ -6,11 +6,10 @@ import math
 
 # Import the modularized classes.
 from experiment import Experiment
-from sample import Sample
 from crystal import Grain
 from ewald import EwaldSphere
 from experiment import Detector
-from broadening_related.gauss_param import fwhm_to_sigma, bivariate_gaussian
+from gauss_param import fwhm_to_sigma, bivariate_gaussian
 
 
 import StructureFactors  # Your external module for structure factors
