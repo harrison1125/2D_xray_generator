@@ -6,7 +6,6 @@ import math
 
 # Import the modularized classes
 from experiment import Experiment
-from sample import Sample
 from crystal import Grain
 from ewald import EwaldSphere
 from detector_module import Detector  # EDIT: This is the updated Detector
