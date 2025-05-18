@@ -5,7 +5,7 @@ import seaborn as sns
 import math
 
 # Import the modularized classes
-from experiment import Experiment
+from src.experiment import Experiment
 from crystal import Grain
 from ewald import EwaldSphere
 from detector_module import Detector  # EDIT: This is the updated Detector
