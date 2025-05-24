@@ -17,7 +17,6 @@ class Detector:
         self.detector_distance = detector_distance
         self.ewald_sphere = ewald_sphere
 
-        # Detector corners (unchanged):
         detector_corners = np.array([
             [detector_distance, -detector_width / 2, -detector_height / 2],
             [detector_distance,  detector_width / 2, -detector_height / 2],
