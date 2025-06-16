@@ -3,13 +3,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import math
+import sys 
+print(sys.path)
 
 # Import the modularized classes
-from experiment import Experiment
-from crystal import Grain
-from ewald import EwaldSphere
-from detector_module import Detector  # EDIT: This is the updated Detector
-from gauss_param import fwhm_to_sigma, bivariate_gaussian
+from classes_and_functions.experiment import Experiment
+from classes_and_functions.crystal import Grain
+from classes_and_functions.ewald import EwaldSphere
+from classes_and_functions.detector_module import Detector  # EDIT: This is the updated Detector
+from classes_and_functions.gauss_param import fwhm_to_sigma, bivariate_gaussian
 
 import StructureFactors  # For structure factor computations
 
