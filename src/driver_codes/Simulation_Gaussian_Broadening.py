@@ -92,7 +92,7 @@ first_grain.randomize_grain_size()
 first_grain.randomize_grain_strain()
 initial_ewald = EwaldSphere(first_grain, exp, tolerance=0.03)
 
-detector = Detector(initial_ewald, exp, detector_width=1000, detector_height=1000, detector_distance=300)
+detector = Detector(initial_ewald, exp, detector_width=1000, detector_height=1000, detector_distance=300, structure_factor_func = structure_factor_func)
 
 for grain_index in range(num_grains):
     grain.randomize_rotation()
@@ -101,7 +101,7 @@ for grain_index in range(num_grains):
 
     ewald = EwaldSphere(grain, exp, tolerance=0.01)
     # ADDED: Use the updated Detector that produces Gaussian spots
-    detector = Detector(ewald, exp, detector_width=1000, detector_height=1000, detector_distance=300)
+    detector = Detector(ewald, exp, detector_width=1000, detector_height=1000, detector_distance=300, structure_factor_func = structure_factor_func)
     projected_points = detector.project_points()
 
     # Collect the raw (x, y, z) coordinates for a scatter plot if desired
@@ -177,3 +177,6 @@ else:
     print("No projected points to display.")
 '''
 
+if __name__ == "__main__":
+    # do something 
+    print('1')

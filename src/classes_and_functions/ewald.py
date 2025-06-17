@@ -19,4 +19,8 @@ class EwaldSphere:
         mask = (distances >= self.radius - self.tolerance) & (
             distances <= self.radius + self.tolerance
         )
-        return self.grain.reciprocal_lattice_vectors[mask]
+        vectors = self.grain.reciprocal_lattice_vectors[mask]
+        hkls = np.array(self.grain.hkl_indices)[mask]
+
+        # Ensure both arrays are 2D
+        return np.hstack((vectors, hkls))

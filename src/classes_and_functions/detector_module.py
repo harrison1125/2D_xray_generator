@@ -10,12 +10,13 @@ class Detector:
       1. Store a 2D image (self.image) representing the detector plane.
       2. Add a Gaussian "blob" for each valid reflection rather than a single pixel.
     """
-    def __init__(self, ewald_sphere, experiment, detector_width, detector_height, detector_distance):
+    def __init__(self, ewald_sphere, experiment, detector_width, detector_height, detector_distance, structure_factor_func):
         self.experiment = experiment
         self.detector_width = detector_width
         self.detector_height = detector_height
         self.detector_distance = detector_distance
         self.ewald_sphere = ewald_sphere
+        self.structure_factor_func = structure_factor_func
 
         detector_corners = np.array([
             [detector_distance, -detector_width / 2, -detector_height / 2],
@@ -80,9 +81,18 @@ class Detector:
                 # print(f"Pixel Indices: row={row}, col={col}")
 
                 # Define Gaussian parameters
-                sigma = 5.0  # Standard deviation (spread) in pixels
+                sigma = 2.0  # Standard deviation (spread) in pixels
                 amplitude = 1.0  # Peak intensity
+                f = 1
 
+                if self.structure_factor_func is not None and len(point) >= 6:
+                    h, k, l = int(point[3]), int(point[4]), int(point[5])
+                    try:
+                        F_hkl = self.structure_factor_func(h, k, l, f)
+                        amplitude *= abs(F_hkl)**2  # Square modulus gives intensity
+                    except Exception as e:
+                        print(f"Structure factor error for (hkl)=({h},{k},{l}): {e}")
+                        amplitude = 0.0
                 # Debugging: Check the Gaussian parameters
                 # print(f"Gaussian Parameters: sigma={sigma}, amplitude={amplitude}")
 
