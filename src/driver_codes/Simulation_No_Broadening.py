@@ -4,12 +4,12 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import math
 
-# Import the modularized classes.
-from experiment import Experiment
-from crystal import Grain
-from ewald import EwaldSphere
-from experiment import Detector
-from gauss_param import fwhm_to_sigma, bivariate_gaussian
+# Import the modularized classes
+from classes_and_functions.experiment import Experiment
+from classes_and_functions.crystal import Grain
+from classes_and_functions.ewald import EwaldSphere
+from classes_and_functions.detector_module import Detector  # EDIT: This is the updated Detector
+from classes_and_functions.gauss_param import fwhm_to_sigma, bivariate_gaussian
 
 
 import StructureFactors  # Your external module for structure factors

@@ -3,20 +3,23 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import math
+import sys 
+print(sys.path)
 
 # Import the modularized classes
-from experiment import Experiment
-from sample import Sample
-from crystal import Grain
-from ewald import EwaldSphere
-from detector_module import Detector  # EDIT: This is the updated Detector
-from gauss_param import fwhm_to_sigma, bivariate_gaussian
+from classes_and_functions.experiment import Experiment
+from classes_and_functions.crystal import Grain
+from classes_and_functions.ewald import EwaldSphere
+from classes_and_functions.detector_module import Detector  # EDIT: This is the updated Detector
+from classes_and_functions.gauss_param import fwhm_to_sigma, bivariate_gaussian
 
 import StructureFactors  # For structure factor computations
 
 # --------------------------------------------------
 # The next lines for structure factor / user input remain unchanged
 # --------------------------------------------------
+
+print(StructureFactors.structure_factor_fcc(1,1,0,1))
 
 CrystalStructure = input('What is the crystal structure? ')
 structure_factor_map = {
@@ -91,7 +94,7 @@ first_grain.randomize_grain_size()
 first_grain.randomize_grain_strain()
 initial_ewald = EwaldSphere(first_grain, exp, tolerance=0.03)
 
-detector = Detector(initial_ewald, exp, detector_width=1000, detector_height=1000, detector_distance=300)
+detector = Detector(initial_ewald, exp, detector_width=1000, detector_height=1000, detector_distance=300, structure_factor_func = structure_factor_func)
 
 for grain_index in range(num_grains):
     grain.randomize_rotation()
@@ -100,7 +103,7 @@ for grain_index in range(num_grains):
 
     ewald = EwaldSphere(grain, exp, tolerance=0.01)
     # ADDED: Use the updated Detector that produces Gaussian spots
-    detector = Detector(ewald, exp, detector_width=1000, detector_height=1000, detector_distance=300)
+    detector = Detector(ewald, exp, detector_width=1000, detector_height=1000, detector_distance=300, structure_factor_func = structure_factor_func)
     projected_points = detector.project_points()
 
     # Collect the raw (x, y, z) coordinates for a scatter plot if desired
@@ -118,7 +121,7 @@ coords_on_detector = np.array(coords_on_detector)
 
 # --- Block the central spot using Option 1: Completely block it ---
 # Define the blocker FWHM (in pixels) based on the central spot's size (adjust as needed)
-blocker_fwhm = 35.0 
+blocker_fwhm = 50.0 
 blocker_radius = blocker_fwhm / 2.0
 
 # Determine the center of the composite image
@@ -176,3 +179,6 @@ else:
     print("No projected points to display.")
 '''
 
+if __name__ == "__main__":
+    # do something 
+    print('1')
