@@ -19,6 +19,8 @@ import StructureFactors  # For structure factor computations
 # The next lines for structure factor / user input remain unchanged
 # --------------------------------------------------
 
+print(StructureFactors.structure_factor_fcc(1,1,0,1))
+
 CrystalStructure = input('What is the crystal structure? ')
 structure_factor_map = {
     'SC': StructureFactors.structure_factor_sc, 
@@ -119,7 +121,7 @@ coords_on_detector = np.array(coords_on_detector)
 
 # --- Block the central spot using Option 1: Completely block it ---
 # Define the blocker FWHM (in pixels) based on the central spot's size (adjust as needed)
-blocker_fwhm = 35.0 
+blocker_fwhm = 50.0 
 blocker_radius = blocker_fwhm / 2.0
 
 # Determine the center of the composite image

@@ -89,7 +89,7 @@ class Detector:
                     h, k, l = int(point[3]), int(point[4]), int(point[5])
                     try:
                         F_hkl = self.structure_factor_func(h, k, l, f)
-                        amplitude *= abs(F_hkl)**2  # Square modulus gives intensity
+                        amplitude *= abs((F_hkl)**2)  # Square modulus gives intensity
                     except Exception as e:
                         print(f"Structure factor error for (hkl)=({h},{k},{l}): {e}")
                         amplitude = 0.0
