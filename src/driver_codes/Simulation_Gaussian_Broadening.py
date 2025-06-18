@@ -4,11 +4,10 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import math
 import sys 
-print(sys.path)
 
 # Import the modularized classes
 from classes_and_functions.experiment import Experiment
-from classes_and_functions.crystal import Grain
+from classes_and_functions.crystal import Grain_general
 from classes_and_functions.ewald import EwaldSphere
 from classes_and_functions.detector_module import Detector  # EDIT: This is the updated Detector
 from classes_and_functions.gauss_param import fwhm_to_sigma, bivariate_gaussian
@@ -18,8 +17,6 @@ import StructureFactors  # For structure factor computations
 # --------------------------------------------------
 # The next lines for structure factor / user input remain unchanged
 # --------------------------------------------------
-
-print(StructureFactors.structure_factor_fcc(1,1,0,1))
 
 CrystalStructure = input('What is the crystal structure? ')
 structure_factor_map = {
@@ -65,30 +62,42 @@ Z = bivariate_gaussian(X, Y, max_intensity, x_center, y_center, sigma, sigma)
 num_grains = int(input('How many grains? '))
 exp = Experiment(wavelength=0.154, sample="Arbitrary")
 
-grain = Grain(
+grain = Grain_general(
     size_average=33500, 
     size_variance=33062500, 
     strain_average=0, 
     strain_variance=0, 
     aspect_ratio=1.5, 
-    lattice_parameter=0.361, 
+    a=0.308, 
+    b=0.308, 
+    c=1.512, 
+    alpha=90, 
+    beta=90, 
+    gamma=120, 
     experiment=exp
 )
+
 
 # Initialize the composite image and coordinates
 coords_on_detector = []
 composite_image = np.zeros((1000, 1000))
 
 
-first_grain = Grain(
+first_grain = Grain_general(
     size_average=33500, 
     size_variance=33062500, 
     strain_average=0, 
     strain_variance=0, 
     aspect_ratio=1.5, 
-    lattice_parameter=0.361, 
+    a=0.308, 
+    b=0.308, 
+    c=1.512, 
+    alpha=90, 
+    beta=90, 
+    gamma=120, 
     experiment=exp
 )
+
 first_grain.randomize_rotation()
 first_grain.randomize_grain_size()
 first_grain.randomize_grain_strain()

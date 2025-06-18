@@ -3,8 +3,11 @@ import numpy as np
 from scipy.spatial.transform import Rotation as R
 import math 
 
+class Experiment:
+    def __init__(self, wavelength):
+        self.wavelength = wavelength
 
-class Grain:
+class GrainCubic:
     ''' 
     grain size, lattice parameter, and wavelength need to have the same units, 
     as they all convert into the reciprocal lattice. Any mistakes here will affect 
@@ -83,61 +86,125 @@ class Grain:
         self.randomize_grain_strain
         self.randomize_rotation
 
-#Below is a grain that can be used for creating non-cubic reciprocal lattices. Consider implementing later
-# class Grain:
-#     def __init__(self, lattice_parameters, orientation=None):
-#         """
-#         Represents a single grain in a polycrystalline material.
 
-#         :param lattice_parameters: Tuple containing the lattice constants (a, b, c, α, β, γ)
-#         :param orientation: 3x3 rotation matrix or Euler angles defining grain orientation
-#         """
-#         self.lattice_parameters = lattice_parameters
 
-#         # If no orientation is provided, set a random orientation
-#         if orientation is None:
-#             self.orientation = R.random().as_matrix()
-#         elif isinstance(orientation, (list, np.ndarray)) and len(orientation) == 3:
-#             self.orientation = R.from_euler(
-#                 "xyz", orientation, degrees=True
-#             ).as_matrix()
-#         else:
-#             self.orientation = np.array(orientation)
+import numpy as np
+import math
 
-#     def rotate_vector(self, vector):
-#         """Apply the grain's orientation to a given vector."""
-#         return self.orientation @ np.array(vector)
+class Grain_general:
+    ''' 
+    Handles grain size, strain, and reciprocal lattice vectors for any crystal system.
+    Lattice parameters: a, b, c and angles: alpha, beta, gamma (in degrees).
+    '''
+    def __init__(self, size_average, size_variance, strain_average, strain_variance,
+                 aspect_ratio, a, b, c, alpha, beta, gamma, experiment):
 
-#     def get_reciprocal_lattice_vectors(self):
-#         """Computes reciprocal lattice vectors based on lattice parameters."""
-#         a, b, c, alpha, beta, gamma = self.lattice_parameters
+        self.size_average = size_average 
+        self.size_variance = size_variance 
+        self.aspect_ratio = aspect_ratio  # still unused
+        self.strain_average = strain_average 
+        self.strain_variance = strain_variance
 
-#         # Convert angles to radians
-#         alpha, beta, gamma = np.radians([alpha, beta, gamma])
+        self.a = a
+        self.b = b
+        self.c = c
+        self.alpha = np.radians(alpha)
+        self.beta  = np.radians(beta)
+        self.gamma = np.radians(gamma)
 
-#         # Compute unit cell volume
-#         volume = (
-#             a
-#             * b
-#             * c
-#             * np.sqrt(
-#                 1
-#                 - np.cos(alpha) ** 2
-#                 - np.cos(beta) ** 2
-#                 - np.cos(gamma) ** 2
-#                 + 2 * np.cos(alpha) * np.cos(beta) * np.cos(gamma)
-#             )
-#         )
+        self.sphere_range = math.floor(1 / experiment.wavelength)
 
-#         # Compute reciprocal lattice vectors
-#         b1 = (
-#             np.cross(
-#                 [b * np.cos(gamma), b * np.sin(gamma), 0],
-#                 [c * np.cos(beta), 0, c * np.sin(beta)],
-#             )
-#             / volume
-#         )
-#         b2 = np.cross([c * np.cos(beta), 0, c * np.sin(beta)], [a, 0, 0]) / volume
-#         b3 = np.cross([a, 0, 0], [b * np.cos(gamma), b * np.sin(gamma), 0]) / volume
+        # Generate all integer (h, k, l) indices within the sphere range
+        self.hkl_indices = [
+            (h, k, l)
+            for h in range(-self.sphere_range, self.sphere_range + 1)
+            for k in range(-self.sphere_range, self.sphere_range + 1)
+            for l in range(-self.sphere_range, self.sphere_range + 1)
+        ]
 
-#         return np.array([b1, b2, b3])
+        # Generate reciprocal lattice vectors
+        self.reciprocal_lattice_vectors = self._generate_reciprocal_vectors()
+
+    def _generate_reciprocal_vectors(self):
+        # Construct the real-space lattice vectors
+        a1 = np.array([self.a, 0, 0])
+        a2 = np.array([
+            self.b * np.cos(self.gamma),
+            self.b * np.sin(self.gamma),
+            0
+        ])
+        cx = self.c * np.cos(self.beta)
+        cy = self.c * (np.cos(self.alpha) - np.cos(self.beta) * np.cos(self.gamma)) / np.sin(self.gamma)
+        cz = np.sqrt(self.c**2 - cx**2 - cy**2)
+        a3 = np.array([cx, cy, cz])
+
+        # Volume of the real-space unit cell
+        volume = np.dot(a1, np.cross(a2, a3))
+
+        # Reciprocal lattice vectors
+        b1 = np.cross(a2, a3) / volume
+        b2 = np.cross(a3, a1) / volume
+        b3 = np.cross(a1, a2) / volume
+
+        # Generate all reciprocal lattice points using hkl indices
+        reciprocal_vectors = np.array([
+            h * b1 + k * b2 + l * b3
+            for h, k, l in self.hkl_indices
+        ])
+
+        return reciprocal_vectors
+
+    def randomize_grain_size(self):
+        return np.random.normal(self.size_average, np.sqrt(self.size_variance))
+    
+    def randomize_grain_strain(self):
+        return np.random.normal(self.strain_average, np.sqrt(self.strain_variance))
+
+    def randomize_rotation(self):
+        theta = np.radians(np.random.uniform(0, 360))  # z-axis
+        phi   = np.radians(np.random.uniform(0, 360))  # x-axis
+
+        Rz = np.array([
+            [np.cos(theta), -np.sin(theta), 0],
+            [np.sin(theta),  np.cos(theta), 0],
+            [0, 0, 1]
+        ])
+        Rx = np.array([
+            [1, 0, 0],
+            [0, np.cos(phi), -np.sin(phi)],
+            [0, np.sin(phi),  np.cos(phi)]
+        ])
+
+        R = Rx @ Rz  
+        self.reciprocal_lattice_vectors = self.reciprocal_lattice_vectors @ R.T
+
+if __name__ == "__main__":
+    wavelength = 1.54  # in Angstroms
+    lattice_param = 3.615  # FCC copper in Angstroms
+
+    experiment = Experiment(wavelength=wavelength)
+
+    grain_cubic = GrainCubic(
+        size_average=100, size_variance=25,
+        strain_average=0.001, strain_variance=0.0001,
+        aspect_ratio=1,
+        lattice_parameter=lattice_param,
+        experiment=experiment
+    )
+
+    grain_general = GrainGeneral(
+        size_average=100, size_variance=25,
+        strain_average=0.001, strain_variance=0.0001,
+        aspect_ratio=1,
+        a=lattice_param, b=lattice_param, c=lattice_param,
+        alpha=90, beta=90, gamma=90,
+        experiment=experiment
+    )
+
+    print("Sample reciprocal vectors (Cubic):")
+    for vec in grain_cubic.reciprocal_lattice_vectors[:5]:
+        print(vec)
+
+    print("\nSample reciprocal vectors (General):")
+    for vec in grain_general.reciprocal_lattice_vectors[:5]:
+        print(vec)
