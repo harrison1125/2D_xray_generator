@@ -68,12 +68,12 @@ grain = Grain_general(
     strain_average=0, 
     strain_variance=0, 
     aspect_ratio=1.5, 
-    a=0.308, 
-    b=0.308, 
-    c=1.512, 
+    a=0.332, 
+    b=0.332, 
+    c=0.332, 
     alpha=90, 
     beta=90, 
-    gamma=120, 
+    gamma=90, 
     experiment=exp
 )
 
@@ -101,7 +101,7 @@ first_grain = Grain_general(
 first_grain.randomize_rotation()
 first_grain.randomize_grain_size()
 first_grain.randomize_grain_strain()
-initial_ewald = EwaldSphere(first_grain, exp, tolerance=0.03)
+initial_ewald = EwaldSphere(first_grain, exp, tolerance=0.05)
 
 detector = Detector(initial_ewald, exp, detector_width=1000, detector_height=1000, detector_distance=300, structure_factor_func = structure_factor_func)
 
@@ -110,7 +110,7 @@ for grain_index in range(num_grains):
     grain.randomize_grain_size()
     grain.randomize_grain_strain()
 
-    ewald = EwaldSphere(grain, exp, tolerance=0.01)
+    ewald = EwaldSphere(grain, exp, tolerance=0.03)
     # ADDED: Use the updated Detector that produces Gaussian spots
     detector = Detector(ewald, exp, detector_width=1000, detector_height=1000, detector_distance=300, structure_factor_func = structure_factor_func)
     projected_points = detector.project_points()
