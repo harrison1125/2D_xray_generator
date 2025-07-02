@@ -81,7 +81,7 @@ class Detector:
                 # print(f"Pixel Indices: row={row}, col={col}")
 
                 # Define Gaussian parameters
-                sigma = 2.0  # Standard deviation (spread) in pixels
+                sigma = 2  # Standard deviation (spread) in pixels
                 amplitude = 1.0  # Peak intensity
                 f = 1
 

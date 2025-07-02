@@ -10,8 +10,7 @@ from classes_and_functions.crystal import Grain
 from classes_and_functions.ewald import EwaldSphere
 from classes_and_functions.detector_module import Detector  # EDIT: This is the updated Detector
 from classes_and_functions.gauss_param import fwhm_to_sigma, bivariate_gaussian
-
-
+# 
 import StructureFactors  # Your external module for structure factors
 
 # User input for crystal structure.
@@ -24,7 +23,7 @@ structure_factor_map = {
 }
 
 if CrystalStructure in structure_factor_map:
-    structure_factor_func = structure_factor_map[CrystalStructure]
+    structure_factor_func = structure_factor_map[CrystalStructuref]
 else:
     structure_factor_func = None  # EDIT: for handling potential errors
 
@@ -62,7 +61,7 @@ Z = bivariate_gaussian(X, Y, max_intensity, x_center, y_center, sigma, sigma)
 
 # --- Main simulation ---
 num_grains = int(input('How many grains? '))
-exp = Experiment(wavelength=0.154, sample="Arbitrary")
+exp = Experiment(wavelength=1.514, sample="Arbitrary")
 grain = Grain(size_average=33500, size_variance=33062500, strain_average=0, strain_variance=0, aspect_ratio=1.5, lattice_parameter=0.361, experiment=exp)
 coords_on_detector = []
 

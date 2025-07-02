@@ -5,7 +5,7 @@ import numpy as np
 class EwaldSphere:
     """Defines an Ewald sphere for diffraction conditions."""
 
-    def __init__(self, grain, experiment, tolerance=0.03):
+    def __init__(self, grain, experiment, tolerance):
         self.radius = experiment.inv_lambda
         self.center = (-self.radius, 0, 0)
         self.tolerance = tolerance

@@ -2,6 +2,7 @@
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 import math 
+import copy
 
 class Experiment:
     def __init__(self, wavelength):
@@ -64,7 +65,8 @@ class GrainCubic:
     def randomize_rotation(self):
         theta = np.radians(np.random.uniform(0, 360))  # Rotation about z-axis
         phi   = np.radians(np.random.uniform(0, 360))  # Rotation about x-axis
-
+        
+        new_grain = copy.copy(self)
         # Rotation matrices
         Rz = np.array([
             [np.cos(theta), -np.sin(theta), 0],
@@ -79,7 +81,9 @@ class GrainCubic:
 
         # Edit: Combined rotation applied to the reciprocal lattice vectors
         R = Rx @ Rz  
-        self.reciprocal_lattice_vectors = self.reciprocal_lattice_vectors @ R.T
+        new_grain.reciprocal_lattice_vectors = self.reciprocal_lattice_vectors @ R.T
+
+        return new_grain
 
     def randomize_properties (self):
         self.randomize_grain_size
@@ -91,7 +95,8 @@ class GrainCubic:
 import numpy as np
 import math
 
-class Grain_general:
+#something wrong here right now 20250701-HP Think it has to do with the lattice parameters. it is causing the system to generate bad patterns even for known patterns such as BCC
+class GrainGeneral:
     ''' 
     Handles grain size, strain, and reciprocal lattice vectors for any crystal system.
     Lattice parameters: a, b, c and angles: alpha, beta, gamma (in degrees).
