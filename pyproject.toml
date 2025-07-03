@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "2d-xray-generator"
+version = "0.1.0"
+description = ""
+authors = ["harrison1125"]
+readme = "README.md"
+packages = [{ include = "src" }]
+
+[tool.poetry.dependencies]
+python = "^3.9, <=3.12"
+numpy = '*'
+seaborn = '*'
+matplotlib = '*'
+scipy = '*'
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
