@@ -12,6 +12,8 @@ numpy = '*'
 seaborn = '*'
 matplotlib = '*'
 scipy = '*'
+imageio = "^2.37.0"
+pillow = "^11.3.0"
 
 
 [build-system]

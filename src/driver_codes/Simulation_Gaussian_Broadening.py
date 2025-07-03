@@ -20,6 +20,9 @@ import datetime
 import random
 import string
 
+import imageio.v2 as imageio
+from PIL import TiffImagePlugin, Image
+
 def main():
     # 4-character random hex-like ID
     random_id = ''.join(random.choices(string.ascii_letters + string.digits, k=4))
@@ -139,15 +142,31 @@ def main():
     composite_image_blocked[~mask] = 0
 
     # Plot the final composite detector image
-    plt.figure(figsize=(8, 8))
-    plt.imshow(np.log1p(composite_image_blocked), cmap='hot', origin='lower', extent=[-500, 500, -500, 500])
-    plt.xlabel("Detector Width (mm)")
-    plt.ylabel("Detector Height (mm)")
-    plt.title("Final Composite Detector Image with Gaussian Distributed Spots")
-    plt.colorbar(label='Intensity')
-    plt.show()
-
+    # plt.figure(figsize=(8, 8))
+    # plt.imshow(np.log1p(composite_image_blocked), cmap='hot', origin='lower', extent=[-500, 500, -500, 500])
+    # plt.xlabel("Detector Width (mm)")
+    # plt.ylabel("Detector Height (mm)")
+    # plt.title("Final Composite Detector Image with Gaussian Distributed Spots")
+    # plt.colorbar(label='Intensity')
+    # plt.show()
+    
     naming = f'{material_type}_{CrystalStructure}_{num_grains}_{formatted_date}'
+
+    # Save high-precision float32 TIFF using imageio
+    tiff_path = f"{naming}.tiff"
+    imageio.imwrite(tiff_path, composite_image_blocked.astype(np.float32))
+
+    with Image.open(tiff_path) as img:
+        metadata = TiffImagePlugin.ImageFileDirectory_v2()
+        metadata[270] = json.dumps(inputs)  # Tag 270 = ImageDescription
+        img.save(f"{naming}_with_metadata.tiff", tiffinfo=metadata)
+    
+    # testing reading the metadata
+    img = Image.open(f"{naming}_with_metadata.tiff")
+    meta = img.tag_v2
+    print("Tiff metadata: ", json.loads(meta[270]))
+    
+    # dumping inputs to json file
     with open(f'{naming}_inputs.json', 'w') as f:
         json.dump(inputs, f)
 
