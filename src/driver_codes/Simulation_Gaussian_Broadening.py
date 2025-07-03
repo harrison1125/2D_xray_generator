@@ -23,7 +23,14 @@ import string
 import imageio.v2 as imageio
 from PIL import TiffImagePlugin, Image
 
-def main():
+def run_from_cli():
+    CrystalStructure = input('What is the crystal structure? ')
+    num_grains = int(input('How many grains? '))
+    lattice_parameter = 0.3615
+    material_type = "Cu"
+    diffraction_pattern(material_type, CrystalStructure, num_grains, lattice_parameter)
+
+def diffraction_pattern(material_type, CrystalStructure, num_grains, lattice_parameter):
     # 4-character random hex-like ID
     random_id = ''.join(random.choices(string.ascii_letters + string.digits, k=4))
 
@@ -34,15 +41,13 @@ def main():
 
     inputs = {}
 
-    material_type = 'Cu'
     wavelength = 0.0514
     sample_id = "Arbitrary"
-    num_grains = 1000 
 
     inputs['wavelength'] = wavelength
     inputs['sample_id'] = sample_id
 
-    CrystalStructure = input('What is the crystal structure? ')
+    # CrystalStructure = input('What is the crystal structure? ')
     structure_factor_map = {
         'SC': StructureFactors.structure_factor_sc, 
         'FCC': StructureFactors.structure_factor_fcc,
@@ -57,7 +62,7 @@ def main():
 
     inputs['crystal_structure'] = CrystalStructure
 
-    num_grains = int(input('How many grains? '))
+    # num_grains = int(input('How many grains? '))
     exp = Experiment(wavelength=wavelength, sample=sample_id)
 
     size_average = 33500
@@ -65,7 +70,6 @@ def main():
     strain_average = 0
     strain_variance = 0
     aspect_ratio = 1.5
-    lattice_parameter = 0.3615
 
     inputs['lattice_parameter'] = lattice_parameter
 
@@ -171,4 +175,4 @@ def main():
         json.dump(inputs, f)
 
 if __name__ == "__main__":
-    main()
+    run_from_cli()
