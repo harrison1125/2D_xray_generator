@@ -158,10 +158,6 @@ def diffraction_pattern(material_type, CrystalStructure, num_grains, lattice_par
     
     naming = f'{material_type}_{CrystalStructure}_{num_grains}_{formatted_date}'
 
-    # dumping inputs to json file
-    # with open(f'{naming}_inputs.json', 'w') as f:
-    #    metadata_str = json.dump(inputs, f)
-    
     # Convert to JSON string
     metadata_str = json.dumps(inputs, indent=4)
 
@@ -172,11 +168,8 @@ def diffraction_pattern(material_type, CrystalStructure, num_grains, lattice_par
     # Convert to float32 image
     float_image = composite_image_blocked.astype(np.float32)
 
-    # Embed metadata as JSON string
-    # metadata_str = json.dumps(inputs)
-
     # Save the image + metadata using tifffile
-    tiff_path = f"{naming}_float32_with_metadata.tiff"
+    tiff_path = f"{naming}.tiff"
     tifffile.imwrite(tiff_path,
             float_image,
             dtype=np.float32,
@@ -188,10 +181,6 @@ def diffraction_pattern(material_type, CrystalStructure, num_grains, lattice_par
         meta = tif.pages[0].tags['ImageDescription'].value
         metadata_dict = json.loads(meta)
         print("Recovered metadata:", metadata_dict)
-
-    # dumping inputs to json file
-    with open(f'{naming}_inputs.json', 'w') as f:
-        json.dump(inputs, f)
 
 if __name__ == "__main__":
     run_from_cli()
