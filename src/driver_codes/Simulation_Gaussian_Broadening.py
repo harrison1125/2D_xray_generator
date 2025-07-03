@@ -22,12 +22,14 @@ import string
 
 import imageio.v2 as imageio
 from PIL import TiffImagePlugin, Image
+import tifffile
 
 def run_from_cli():
+    material_type = input('What is the material? ')
     CrystalStructure = input('What is the crystal structure? ')
     num_grains = int(input('How many grains? '))
-    lattice_parameter = 0.3615
-    material_type = "Cu"
+    lattice_parameter = float(input('What is the lattice parameter? '))
+    
     diffraction_pattern(material_type, CrystalStructure, num_grains, lattice_parameter)
 
 def diffraction_pattern(material_type, CrystalStructure, num_grains, lattice_parameter):
@@ -156,20 +158,37 @@ def diffraction_pattern(material_type, CrystalStructure, num_grains, lattice_par
     
     naming = f'{material_type}_{CrystalStructure}_{num_grains}_{formatted_date}'
 
-    # Save high-precision float32 TIFF using imageio
-    tiff_path = f"{naming}.tiff"
-    imageio.imwrite(tiff_path, composite_image_blocked.astype(np.float32))
+    # dumping inputs to json file
+    # with open(f'{naming}_inputs.json', 'w') as f:
+    #    metadata_str = json.dump(inputs, f)
+    
+    # Convert to JSON string
+    metadata_str = json.dumps(inputs, indent=4)
 
-    with Image.open(tiff_path) as img:
-        metadata = TiffImagePlugin.ImageFileDirectory_v2()
-        metadata[270] = json.dumps(inputs)  # Tag 270 = ImageDescription
-        img.save(f"{naming}_with_metadata.tiff", tiffinfo=metadata)
+    # Save to file
+    with open(f'{naming}_inputs.json', 'w') as f:
+        f.write(metadata_str)
     
-    # testing reading the metadata
-    img = Image.open(f"{naming}_with_metadata.tiff")
-    meta = img.tag_v2
-    print("Tiff metadata: ", json.loads(meta[270]))
+    # Convert to float32 image
+    float_image = composite_image_blocked.astype(np.float32)
+
+    # Embed metadata as JSON string
+    # metadata_str = json.dumps(inputs)
+
+    # Save the image + metadata using tifffile
+    tiff_path = f"{naming}_float32_with_metadata.tiff"
+    tifffile.imwrite(tiff_path,
+            float_image,
+            dtype=np.float32,
+            metadata={'ImageDescription': metadata_str}
+            )
     
+    with tifffile.TiffFile(tiff_path) as tif:
+        image_data = tif.asarray()
+        meta = tif.pages[0].tags['ImageDescription'].value
+        metadata_dict = json.loads(meta)
+        print("Recovered metadata:", metadata_dict)
+
     # dumping inputs to json file
     with open(f'{naming}_inputs.json', 'w') as f:
         json.dump(inputs, f)
