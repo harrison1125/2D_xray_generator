@@ -19,7 +19,7 @@ import json
 import datetime 
 import random
 import string
-
+import os
 import imageio.v2 as imageio
 from PIL import TiffImagePlugin, Image
 import tifffile
@@ -33,21 +33,22 @@ def run_from_cli():
     diffraction_pattern(material_type, CrystalStructure, num_grains, lattice_parameter)
 
 def diffraction_pattern(material_type, CrystalStructure, num_grains, lattice_parameter):
+
+    destination = 'output/'
+    inputs = {}
+    inputs['material_type'] = material_type
+    inputs['num_grains'] = num_grains
+    wavelength = 0.0514
+    inputs['wavelength'] = wavelength
+    
     # 4-character random hex-like ID
     random_id = ''.join(random.choices(string.ascii_letters + string.digits, k=4))
+    inputs['id'] = random_id
 
     today = datetime.datetime.today()
-
     # Format as MMDDYYYY
     formatted_date = today.strftime("%Y%m%d")
-
-    inputs = {}
-
-    wavelength = 0.0514
-    sample_id = "Arbitrary"
-
-    inputs['wavelength'] = wavelength
-    inputs['sample_id'] = sample_id
+    inputs['formatted_date'] = formatted_date
 
     # CrystalStructure = input('What is the crystal structure? ')
     structure_factor_map = {
@@ -65,7 +66,7 @@ def diffraction_pattern(material_type, CrystalStructure, num_grains, lattice_par
     inputs['crystal_structure'] = CrystalStructure
 
     # num_grains = int(input('How many grains? '))
-    exp = Experiment(wavelength=wavelength, sample=sample_id)
+    exp = Experiment(wavelength=wavelength, sample=material_type)
 
     size_average = 33500
     size_variance = 33062500
@@ -156,13 +157,15 @@ def diffraction_pattern(material_type, CrystalStructure, num_grains, lattice_par
     # plt.colorbar(label='Intensity')
     # plt.show()
     
-    naming = f'{material_type}_{CrystalStructure}_{num_grains}_{formatted_date}'
+    naming = f'{material_type}_{CrystalStructure}_{num_grains}_{formatted_date}_{random_id}'
 
     # Convert to JSON string
     metadata_str = json.dumps(inputs, indent=4)
 
     # Save to file
-    with open(f'{naming}_inputs.json', 'w') as f:
+    inputs_path = f'{naming}_inputs.json'
+    inputs_path = os.path.join(destination, inputs_path)
+    with open(inputs_path, 'w') as f:
         f.write(metadata_str)
     
     # Convert to float32 image
@@ -170,6 +173,7 @@ def diffraction_pattern(material_type, CrystalStructure, num_grains, lattice_par
 
     # Save the image + metadata using tifffile
     tiff_path = f"{naming}.tiff"
+    tiff_path = os.path.join(destination, tiff_path)
     tifffile.imwrite(tiff_path,
             float_image,
             dtype=np.float32,
