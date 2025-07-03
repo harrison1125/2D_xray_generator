@@ -25,12 +25,17 @@ class GrainCubic:
 
         # HKL indices for bookkeeping (used later for structure factor calculations)
         self.hkl_indices = [
-            (h, k, l)
-            for h in range(-self.sphere_range, self.sphere_range + 1)
-            for k in range(-self.sphere_range, self.sphere_range + 1)
-            for l in range(-self.sphere_range, self.sphere_range + 1)
+            # (h, k, l)
+            # for h in range(-self.sphere_range, self.sphere_range + 1)
+            # for k in range(-self.sphere_range, self.sphere_range + 1)
+            # for l in range(-self.sphere_range, self.sphere_range + 1)
             # if h**2 + k**2 + l**2 <= self.sphere_range**2  
             # Limiting sphere (Ewald Sphere constraint)
+            (h, k, l)
+             for h in range(-4, 5)
+             for k in range(-4, 5)
+             for l in range(-4, 5)
+
 
         ]
 
@@ -66,7 +71,7 @@ class GrainCubic:
         theta = np.radians(np.random.uniform(0, 360))  # Rotation about z-axis
         phi   = np.radians(np.random.uniform(0, 360))  # Rotation about x-axis
         
-        new_grain = copy.copy(self)
+        #new_grain = copy.copy(self)
         # Rotation matrices
         Rz = np.array([
             [np.cos(theta), -np.sin(theta), 0],
@@ -81,14 +86,20 @@ class GrainCubic:
 
         # Edit: Combined rotation applied to the reciprocal lattice vectors
         R = Rx @ Rz  
-        new_grain.reciprocal_lattice_vectors = self.reciprocal_lattice_vectors @ R.T
+        
+        self.reciprocal_lattice_vectors = self.reciprocal_lattice_vectors @ R.T
+        # new_grain.reciprocal_lattice_vectors = self.reciprocal_lattice_vectors @ R.T
 
-        return new_grain
+        # return new_grain
 
     def randomize_properties (self):
         self.randomize_grain_size
         self.randomize_grain_strain
         self.randomize_rotation
+
+
+
+
 
 
 

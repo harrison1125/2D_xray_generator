@@ -15,10 +15,6 @@ from classes_and_functions.gauss_param import fwhm_to_sigma, bivariate_gaussian
 
 import StructureFactors  # For structure factor computations
 
-# --------------------------------------------------
-# The next lines for structure factor / user input remain unchanged
-# --------------------------------------------------
-
 CrystalStructure = input('What is the crystal structure? ')
 structure_factor_map = {
     'SC': StructureFactors.structure_factor_sc, 
@@ -32,7 +28,6 @@ if CrystalStructure in structure_factor_map:
 else:
     structure_factor_func = None
 
-# --- Main simulation ---
 num_grains = int(input('How many grains? '))
 exp = Experiment(wavelength=0.0514, sample="Arbitrary")
 
@@ -80,32 +75,13 @@ composite_image = np.zeros((1000,1000))
 #     gamma=90, 
 #     experiment=exp
 # )
-first_grain = GrainCubic(
-    size_average=33500, 
-    size_variance=33062500, 
-    strain_average=0, 
-    strain_variance=0, 
-    aspect_ratio=1.5, 
-    lattice_parameter = 0.3615,
-    experiment=exp
-)
-
-rotated_grain = first_grain.randomize_rotation()
-first_grain.randomize_grain_size()
-first_grain.randomize_grain_strain()
-initial_ewald = EwaldSphere(rotated_grain, exp, tolerance=0.03)
-
-
-
-detector = Detector(initial_ewald, exp, detector_width=1000, detector_height=1000, detector_distance=1147, structure_factor_func = structure_factor_func)
-#currently using 1147 as the detector distance. Seeing as detector width/height are based in pixes, the chosen distance right now represents our detector distance had we calculated it in pixels (86 mm distance, 75 um pixel size: sample-to-detector distance = 1147 pixels)
 
 for grain_index in range(num_grains):
-    rotated_grain= grain.randomize_rotation()
-    grain.randomize_grain_size()
+    grain.randomize_rotation()
+    #grain.randomize_grain_size()
     grain.randomize_grain_strain()
 
-    ewald = EwaldSphere(rotated_grain, exp, tolerance=0.03)
+    ewald = EwaldSphere(grain, exp, tolerance=0.1)
 
     # ADDED: Use the updated Detector that produces Gaussian spots
     detector = Detector(ewald, exp, detector_width=1000, detector_height=1000, detector_distance=1147, structure_factor_func = structure_factor_func)

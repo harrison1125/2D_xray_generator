@@ -23,7 +23,7 @@ structure_factor_map = {
 }
 
 if CrystalStructure in structure_factor_map:
-    structure_factor_func = structure_factor_map[CrystalStructuref]
+    structure_factor_func = structure_factor_map[CrystalStructure]
 else:
     structure_factor_func = None  # EDIT: for handling potential errors
 

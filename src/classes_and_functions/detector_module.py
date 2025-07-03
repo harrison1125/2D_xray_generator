@@ -82,7 +82,7 @@ class Detector:
 
                 # Define Gaussian parameters
                 sigma = 2  # Standard deviation (spread) in pixels
-                amplitude = 1.0  # Peak intensity
+                amplitude = 10.0  # Peak intensity
                 f = 1
 
                 if self.structure_factor_func is not None and len(point) >= 6:
