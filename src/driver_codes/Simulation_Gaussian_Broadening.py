@@ -14,6 +14,15 @@ from classes_and_functions.detector_module import Detector  # EDIT: This is the 
 from classes_and_functions.gauss_param import fwhm_to_sigma, bivariate_gaussian
 
 import StructureFactors  # For structure factor computations
+import json
+
+inputs = {}
+
+wavelength = 0.0514
+sample_id = "Arbitrary"
+
+inputs['wavelength'] = wavelength
+inputs['sample_id'] = sample_id
 
 CrystalStructure = input('What is the crystal structure? ')
 structure_factor_map = {
@@ -26,65 +35,57 @@ structure_factor_map = {
 if CrystalStructure in structure_factor_map:
     structure_factor_func = structure_factor_map[CrystalStructure]
 else:
-    structure_factor_func = None
+    raise ValueError(f'Crystal Structure value of {CrystalStructure} is not elligble.')
+
+inputs['crystal_structure'] = CrystalStructure
 
 num_grains = int(input('How many grains? '))
-exp = Experiment(wavelength=0.0514, sample="Arbitrary")
+exp = Experiment(wavelength=wavelength, sample=sample_id)
 
-# grain = GrainGeneral(
-#     size_average=33500, 
-#     size_variance=33062500, 
-#     strain_average=0, 
-#     strain_variance=0, 
-#     aspect_ratio=1.5, 
-#     a=0.332, 
-#     b=0.332, 
-#     c=0.332, 
-#     alpha=90, 
-#     beta=90, 
-#     gamma=90, 
-#     experiment=exp
-# )
+size_average = 33500
+size_variance = 33062500
+strain_average = 0
+strain_variance = 0
+aspect_ratio = 1.5
+lattice_parameter = 0.3615
+
+inputs['lattice_parameter'] = lattice_parameter
 
 grain = GrainCubic(
-    size_average=33500, 
-    size_variance=33062500, 
-    strain_average=0, 
-    strain_variance=0, 
-    aspect_ratio=1.5, 
-    lattice_parameter = 0.3615,
+    size_average=size_average, 
+    size_variance=size_variance, 
+    strain_average=strain_average, 
+    strain_variance=strain_variance, 
+    aspect_ratio=aspect_ratio, 
+    lattice_parameter = lattice_parameter,
     experiment=exp
 )
 
 # Initialize the composite image and coordinates
 coords_on_detector = []
-composite_image = np.zeros((1000,1000))
+detector_height =  1000
+detector_width = 1000
+composite_image = np.zeros((detector_height, detector_width))
 
+inputs['detector_height'] = detector_height
+inputs['detector_width'] = detector_width
 
-# first_grain = GrainGeneral(
-#     size_average=33500, 
-#     size_variance=33062500, 
-#     strain_average=0, 
-#     strain_variance=0, 
-#     aspect_ratio=1.5, 
-#     a=0.308, 
-#     b=0.308, 
-#     c=0.308, 
-#     alpha=90, 
-#     beta=90, 
-#     gamma=90, 
-#     experiment=exp
-# )
+tolerance = 0.1
+detector_distance_in_mm = 86 # mm
+detector_distance_in_px = detector_distance_in_mm / 0.075 # pixels
+
+inputs['tolerance'] = tolerance
+inputs['detector_distance_in_px'] = detector_distance_in_px
 
 for grain_index in range(num_grains):
     grain.randomize_rotation()
     #grain.randomize_grain_size()
     grain.randomize_grain_strain()
 
-    ewald = EwaldSphere(grain, exp, tolerance=0.1)
+    ewald = EwaldSphere(grain, exp, tolerance=tolerance)
 
     # ADDED: Use the updated Detector that produces Gaussian spots
-    detector = Detector(ewald, exp, detector_width=1000, detector_height=1000, detector_distance=1147, structure_factor_func = structure_factor_func)
+    detector = Detector(ewald, exp, detector_width=detector_width, detector_height=detector_height, detector_distance=detector_distance_in_px, structure_factor_func = structure_factor_func)
     projected_points = detector.project_points()
 
     # Collect the raw (x, y, z) coordinates for a scatter plot if desired
