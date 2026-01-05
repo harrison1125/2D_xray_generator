@@ -9,3 +9,7 @@
 #Gaussian: result of fourier transforming a normal distribution - good for quick, early stage visualization
 
 #Sinc function: result of fourier transforming a rectangular electron density
+
+def gaussian_spread (instrumental_broadening : float):
+    return instrumental_broadening
+    
