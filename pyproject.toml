@@ -16,6 +16,9 @@ imageio = "^2.37.0"
 pillow = "^11.3.0"
 tifffile = "^2025.6.11"
 
+[tool.poetry.scripts]
+xrd-generate = "src.driver_codes.run_experiment:main"
+
 
 [build-system]
 requires = ["poetry-core"]

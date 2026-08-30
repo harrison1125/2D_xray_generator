@@ -1,12 +1,10 @@
-# crystal.py
+"""Grain lattice objects with quaternion orientations and realized properties."""
+import math
 import numpy as np
-from scipy.spatial.transform import Rotation as R
-import math 
-import copy
-
-class Experiment:
-    def __init__(self, wavelength):
-        self.wavelength = wavelength
+from .orientation import (canonicalize_quaternion, quaternion_to_rotation_matrix,
+                          uniform_quaternions)
+from .grain_scattering import ellipsoid_volume
+from .experiment import Experiment
 
 class GrainCubic:
     ''' 
@@ -17,11 +15,16 @@ class GrainCubic:
     def __init__(self, size_average, size_variance, strain_average, strain_variance, aspect_ratio, lattice_parameter, experiment):
         self.size_average = size_average 
         self.size_variance = size_variance 
-        self.aspect_ratio = aspect_ratio  # Unused currently.
+        self.aspect_ratio = aspect_ratio
         self.sphere_range = math.floor(1 / experiment.wavelength)
         self.lattice_parameter = lattice_parameter 
         self.strain_average = strain_average 
         self.strain_variance = strain_variance
+        # Per-realization values are populated by ``realize_properties``.
+        self.grain_size = size_average
+        self.grain_strain = strain_average
+        self.volume = ellipsoid_volume(size_average)
+        self.reference_volume = self.volume
 
         # HKL indices for bookkeeping (used later for structure factor calculations)
         self.hkl_indices = [
@@ -40,7 +43,7 @@ class GrainCubic:
         ]
 
         # Calculate the reciprocal lattice vectors based on lattice parameter.
-        self.reciprocal_lattice_vectors = np.array([
+        self._crystal_reciprocal_lattice_vectors = np.array([
             (
                 h / self.lattice_parameter, 
                 k / self.lattice_parameter, 
@@ -48,6 +51,8 @@ class GrainCubic:
             )
             for h, k, l in self.hkl_indices
         ])
+        self.orientation = np.array([1., 0., 0., 0.])
+        self._update_oriented_reciprocal_lattice()
 
     '''
     I defined grain_size as a method instead of an attribute so that in later 
@@ -57,56 +62,51 @@ class GrainCubic:
     Currently not being used.
     '''
 
-    def randomize_grain_size(self):
+    def randomize_grain_size(self, rng=None):
         # Edit: Changed "grain.size_average" to "self.size_average"
         # should always refer to the instance's attribute, allowing for multiple grains (reusability)
-        return np.random.normal(self.size_average, np.sqrt(self.size_variance))
+        return (np.random.default_rng() if rng is None else rng).normal(self.size_average, np.sqrt(self.size_variance))
     
-    def randomize_grain_strain(self):
+    def randomize_grain_strain(self, rng=None):
         # Edit: Changed "grain.strain_average" to "self.strain_average"
         # same logic as above
-        return np.random.normal(self.strain_average, np.sqrt(self.strain_variance))
+        return (np.random.default_rng() if rng is None else rng).normal(self.strain_average, np.sqrt(self.strain_variance))
 
-    def randomize_rotation(self):
-        theta = np.radians(np.random.uniform(0, 360))  # Rotation about z-axis
-        phi   = np.radians(np.random.uniform(0, 360))  # Rotation about x-axis
-        
-        #new_grain = copy.copy(self)
-        # Rotation matrices
-        Rz = np.array([
-            [np.cos(theta), -np.sin(theta), 0],
-            [np.sin(theta),  np.cos(theta), 0],
-            [0, 0, 1]
-        ])
-        Rx = np.array([
-            [1, 0, 0],
-            [0, np.cos(phi), -np.sin(phi)],
-            [0, np.sin(phi),  np.cos(phi)]
-        ])
+    def _update_oriented_reciprocal_lattice(self):
+        """Derive sample-frame reciprocal vectors from immutable crystal vectors."""
+        matrix = quaternion_to_rotation_matrix(self.orientation)
+        self.reciprocal_lattice_vectors = self._crystal_reciprocal_lattice_vectors @ matrix.T
 
-        # Edit: Combined rotation applied to the reciprocal lattice vectors
-        R = Rx @ Rz  
-        
-        self.reciprocal_lattice_vectors = self.reciprocal_lattice_vectors @ R.T
-        # new_grain.reciprocal_lattice_vectors = self.reciprocal_lattice_vectors @ R.T
+    def set_orientation(self, quaternion):
+        """Set active crystal-to-sample ``[w,x,y,z]`` orientation."""
+        self.orientation = canonicalize_quaternion(np.asarray(quaternion, dtype=float))
+        self._update_oriented_reciprocal_lattice()
 
-        # return new_grain
+    def randomize_rotation(self, rng=None):
+        """Backward-compatible random orientation using Haar-uniform SO(3)."""
+        self.set_orientation(uniform_quaternions(1, rng)[0])
+        return self.orientation
 
-    def randomize_properties (self):
-        self.randomize_grain_size
-        self.randomize_grain_strain
-        self.randomize_rotation
+    def realize_properties(self, rng=None):
+        """Sample and retain this grain's size, strain, and volume."""
+        rng = np.random.default_rng() if rng is None else rng
+        # A normal distribution can produce a nonphysical negative tail.
+        self.grain_size = max(np.finfo(float).eps, self.randomize_grain_size(rng))
+        self.grain_strain = self.randomize_grain_strain(rng)
+        self.volume = ellipsoid_volume(self.grain_size)
+        return self.grain_size, self.grain_strain
 
+    def randomize_properties(self, rng=None):
+        """Backward-compatible convenience method that retains all sampled values."""
+        self.randomize_rotation(rng)
+        return self.realize_properties(rng)
 
 
 
 
 
 
-import numpy as np
-import math
 
-#something wrong here right now 20250701-HP Think it has to do with the lattice parameters. it is causing the system to generate bad patterns even for known patterns such as BCC
 class GrainGeneral:
     ''' 
     Handles grain size, strain, and reciprocal lattice vectors for any crystal system.
@@ -120,6 +120,10 @@ class GrainGeneral:
         self.aspect_ratio = aspect_ratio  # still unused
         self.strain_average = strain_average 
         self.strain_variance = strain_variance
+        self.grain_size = size_average
+        self.grain_strain = strain_average
+        self.volume = ellipsoid_volume(size_average)
+        self.reference_volume = self.volume
 
         self.a = a
         self.b = b
@@ -139,7 +143,9 @@ class GrainGeneral:
         ]
 
         # Generate reciprocal lattice vectors
-        self.reciprocal_lattice_vectors = self._generate_reciprocal_vectors()
+        self._crystal_reciprocal_lattice_vectors = self._generate_reciprocal_vectors()
+        self.orientation = np.array([1., 0., 0., 0.])
+        self._update_oriented_reciprocal_lattice()
 
     def _generate_reciprocal_vectors(self):
         # Construct the real-space lattice vectors
@@ -170,29 +176,30 @@ class GrainGeneral:
 
         return reciprocal_vectors
 
-    def randomize_grain_size(self):
-        return np.random.normal(self.size_average, np.sqrt(self.size_variance))
+    def randomize_grain_size(self, rng=None):
+        return (np.random.default_rng() if rng is None else rng).normal(self.size_average, np.sqrt(self.size_variance))
     
-    def randomize_grain_strain(self):
-        return np.random.normal(self.strain_average, np.sqrt(self.strain_variance))
+    def randomize_grain_strain(self, rng=None):
+        return (np.random.default_rng() if rng is None else rng).normal(self.strain_average, np.sqrt(self.strain_variance))
 
-    def randomize_rotation(self):
-        theta = np.radians(np.random.uniform(0, 360))  # z-axis
-        phi   = np.radians(np.random.uniform(0, 360))  # x-axis
+    def _update_oriented_reciprocal_lattice(self):
+        matrix = quaternion_to_rotation_matrix(self.orientation)
+        self.reciprocal_lattice_vectors = self._crystal_reciprocal_lattice_vectors @ matrix.T
 
-        Rz = np.array([
-            [np.cos(theta), -np.sin(theta), 0],
-            [np.sin(theta),  np.cos(theta), 0],
-            [0, 0, 1]
-        ])
-        Rx = np.array([
-            [1, 0, 0],
-            [0, np.cos(phi), -np.sin(phi)],
-            [0, np.sin(phi),  np.cos(phi)]
-        ])
+    def set_orientation(self, quaternion):
+        self.orientation = canonicalize_quaternion(np.asarray(quaternion, dtype=float))
+        self._update_oriented_reciprocal_lattice()
 
-        R = Rx @ Rz  
-        self.reciprocal_lattice_vectors = self.reciprocal_lattice_vectors @ R.T
+    def randomize_rotation(self, rng=None):
+        self.set_orientation(uniform_quaternions(1, rng)[0])
+        return self.orientation
+
+    def realize_properties(self, rng=None):
+        rng = np.random.default_rng() if rng is None else rng
+        self.grain_size = max(np.finfo(float).eps, self.randomize_grain_size(rng))
+        self.grain_strain = self.randomize_grain_strain(rng)
+        self.volume = ellipsoid_volume(self.grain_size)
+        return self.grain_size, self.grain_strain
 
 if __name__ == "__main__":
     wavelength = 1.54  # in Angstroms
