@@ -1,5 +1,6 @@
 import numpy as np
 import unittest
+from scipy.integrate import quad
 from src.classes_and_functions.configuration import validate_config
 
 from src.classes_and_functions.crystal import GrainCubic
@@ -7,13 +8,17 @@ from src.classes_and_functions.experiment import Experiment
 from src.classes_and_functions.grain_scattering import coherent_length, peak_properties
 from src.classes_and_functions.orientation import (
     euler_to_quaternion, quaternion_to_euler, quaternion_to_rotation_matrix,
-    rotation_matrix_to_quaternion, rotate_vector, uniform_quaternions,
+    rotation_matrix_to_quaternion, rotate_vector, uniform_quaternions, compose_rotations,
 )
 from src.classes_and_functions.texture import (
-    FiberODF, MixtureODF, OrientationComponent, RandomODF, estimate_odf,
-    SharpOrientationODF, get_symmetry_operations,
+    FiberODF, MixtureODF, OrientationComponent, PartialFiberODF, RandomODF, estimate_odf,
+    SharpOrientationODF, get_symmetry_operations, odf_from_dict,
 )
 from src.driver_codes.Simulation_Gaussian_Broadening import run_experiment
+from src.classes_and_functions.continuous_odf import (
+    SobolODFSpace, dvp_exponent_from_fwhm, dvp_log_normalization,
+    harmonic_coefficients, sobol_unit_cube,
+)
 
 
 def test_quaternion_identity_and_ninety_degree_rotation():
@@ -78,6 +83,37 @@ def test_symmetry_and_grain_rotation_preserve_reciprocal_lengths():
     assert np.allclose(np.linalg.norm(grain.reciprocal_lattice_vectors, axis=1), baseline)
 
 
+def test_partial_fiber_serialization_and_offset_sampling():
+    odf = PartialFiberODF([1, 1, 1], [0.2, 0, 0.98], spread_deg=6,
+                          spin_center_deg=40, spin_width_deg=180)
+    restored = odf_from_dict(odf.to_dict())
+    assert restored.to_dict() == odf.to_dict()
+    q = odf.sample(2000, np.random.default_rng(5))
+    directions = np.einsum("nij,j->ni", quaternion_to_rotation_matrix(q), [1, 1, 1])
+    directions /= np.linalg.norm(directions, axis=1)[:, None]
+    assert np.mean(directions @ np.array([0.2, 0, 0.98])) > 0.98
+
+
+def test_continuous_odf_normalization_symmetry_and_sobol_determinism():
+    exponent = float(dvp_exponent_from_fwhm(8.0))
+    normalizer = float(np.exp(dvp_log_normalization(exponent)))
+    integral = quad(lambda theta: normalizer * np.cos(theta / 2) ** (2 * exponent)
+                    * (2 / np.pi) * np.sin(theta / 2) ** 2, 0, np.pi,
+                    epsabs=1e-10)[0]
+    assert np.isclose(integral, 1.0, atol=1e-9)
+    space = SobolODFSpace("cubic", max_components=5)
+    points_a = sobol_unit_cube(4, space.dimension, seed=99)
+    points_b = sobol_unit_cube(4, space.dimension, seed=99)
+    assert np.allclose(points_a, points_b)
+    odf = space.from_unit_cube(points_a[0])
+    q = uniform_quaternions(10, np.random.default_rng(11))
+    equivalent = np.array([compose_rotations(item, get_symmetry_operations("cubic")) for item in q])
+    assert np.allclose(odf.evaluate(equivalent), odf.evaluate(q)[:, None], atol=2e-10)
+    coefficients = harmonic_coefficients(odf, 3)
+    assert np.allclose(coefficients[0], [[1.0]], atol=1e-12)
+    assert get_symmetry_operations("monoclinic").shape == (2, 4)
+
+
 def test_grain_shape_and_size_control_peak_width_and_intensity():
     grain = GrainCubic(1000, 0, 0.001, 0, 2.0, 3.6, Experiment(.1, "test"))
     grain.grain_size, grain.grain_strain = 1000., .001
@@ -114,5 +150,7 @@ class TestOrientationTexture(unittest.TestCase):
     def test_convergence(self): test_random_texture_converges_with_grain_count()
     def test_odfs(self): test_component_fiber_mixture_and_empirical_odf_sampling()
     def test_symmetry_and_grain(self): test_symmetry_and_grain_rotation_preserve_reciprocal_lengths()
+    def test_partial_fiber(self): test_partial_fiber_serialization_and_offset_sampling()
+    def test_continuous_odf(self): test_continuous_odf_normalization_symmetry_and_sobol_determinism()
     def test_shape_and_intensity(self): test_grain_shape_and_size_control_peak_width_and_intensity()
     def test_configuration(self): test_configuration_drives_texture_and_grain_realizations()

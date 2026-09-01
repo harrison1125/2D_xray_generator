@@ -19,6 +19,13 @@ float
 def structure_factor_sc(h, k, l, f):
     return f
 
+# Primitive lattice / placeholder for a general basis.  This provides valid
+# reciprocal-lattice geometry for low-symmetry test cases, but users must
+# replace it with a material-specific basis and atomic form factors before
+# interpreting absolute intensities physically.
+def structure_factor_primitive(h, k, l, f):
+    return f
+
 # Face-Centered Cubic (FCC)
 def structure_factor_fcc(h, k, l, f):
     return f * (1 + (-1)**(h+k) + (-1)**(k+l) + (-1)**(h+l))
@@ -64,4 +71,3 @@ def structure_factor_rhombohedral(h, k, l, f):
         return f
     else:
         return 0
-    

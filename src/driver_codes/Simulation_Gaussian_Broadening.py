@@ -7,7 +7,7 @@ import numpy as np
 
 from src.classes_and_functions import StructureFactors
 from src.classes_and_functions.configuration import validate_config
-from src.classes_and_functions.crystal import GrainCubic
+from src.classes_and_functions.crystal import GrainCubic, GrainGeneral
 from src.classes_and_functions.detector_module import Detector
 from src.classes_and_functions.ewald import EwaldSphere
 from src.classes_and_functions.experiment import Experiment
@@ -19,7 +19,9 @@ except ImportError:
     tifffile = None
 
 STRUCTURE_FACTORS = {"SC": StructureFactors.structure_factor_sc, "FCC": StructureFactors.structure_factor_fcc,
-                     "BCC": StructureFactors.structure_factor_bcc, "HCP": StructureFactors.structure_factor_hcp}
+                     "BCC": StructureFactors.structure_factor_bcc, "HCP": StructureFactors.structure_factor_hcp,
+                     "MONOCLINIC": StructureFactors.structure_factor_primitive,
+                     "TRICLINIC": StructureFactors.structure_factor_primitive}
 
 
 def _json_value(value):
@@ -40,10 +42,14 @@ def _block_direct_beam(image, fwhm_px):
 def _save_result(result, config):
     output = config["output"]; directory = Path(output["directory"]); directory.mkdir(parents=True, exist_ok=True)
     prefix = output["prefix"]
-    paths = {"metadata": directory / f"{prefix}_metadata.json", "grains": directory / f"{prefix}_grains.json", "peaks": directory / f"{prefix}_peaks.json"}
+    paths = {"metadata": directory / f"{prefix}_metadata.json"}
     paths["metadata"].write_text(json.dumps(result["metadata"], indent=2, default=_json_value))
-    paths["grains"].write_text(json.dumps(result["grains"], indent=2, default=_json_value))
-    paths["peaks"].write_text(json.dumps(result["peaks"], indent=2, default=_json_value))
+    if output["store_grains"]:
+        paths["grains"] = directory / f"{prefix}_grains.json"
+        paths["grains"].write_text(json.dumps(result["grains"], indent=2, default=_json_value))
+    if output["store_peaks"]:
+        paths["peaks"] = directory / f"{prefix}_peaks.json"
+        paths["peaks"].write_text(json.dumps(result["peaks"], indent=2, default=_json_value))
     if tifffile is None:
         paths["image"] = directory / f"{prefix}_pattern.npy"; np.save(paths["image"], result["image"].astype(np.float32))
     else:
@@ -60,9 +66,18 @@ def run_experiment(config, *, save=True, odf=None):
     odf = odf_from_dict(config["texture"]) if odf is None else odf
     structure = exp_cfg["crystal_structure"].upper()
     experiment = Experiment(exp_cfg["wavelength"], exp_cfg["material"])
-    grain = GrainCubic(grain_cfg["size_mean"], grain_cfg["size_std"]**2,
-                       grain_cfg["strain_mean"], grain_cfg["strain_std"]**2,
-                       grain_cfg["aspect_ratio"], exp_cfg["lattice_parameter"], experiment)
+    if structure in {"MONOCLINIC", "TRICLINIC"}:
+        cell = exp_cfg["unit_cell"]
+        grain = GrainGeneral(grain_cfg["size_mean"], grain_cfg["size_std"]**2,
+                             grain_cfg["strain_mean"], grain_cfg["strain_std"]**2,
+                             grain_cfg["aspect_ratio"], cell["a"], cell["b"], cell["c"],
+                             cell["alpha_deg"], cell["beta_deg"], cell["gamma_deg"], experiment,
+                             max_hkl_index=exp_cfg["max_hkl_index"])
+    else:
+        grain = GrainCubic(grain_cfg["size_mean"], grain_cfg["size_std"]**2,
+                           grain_cfg["strain_mean"], grain_cfg["strain_std"]**2,
+                           grain_cfg["aspect_ratio"], exp_cfg["lattice_parameter"], experiment,
+                           max_hkl_index=exp_cfg["max_hkl_index"])
     width, height = det_cfg["width_px"], det_cfg["height_px"]
     distance = det_cfg["distance_mm"] / det_cfg["pixel_size_mm"]
     image = np.zeros((height, width), dtype=float); grains = []; peaks = []
@@ -77,9 +92,14 @@ def run_experiment(config, *, save=True, odf=None):
                             instrumental_fwhm_px=scattering["instrumental_fwhm_px"],
                             intensity_scale=scattering["intensity_scale"])
         projection = detector.project_points(); image += projection["image"]; peaks.extend(projection["peaks"])
+    # Persist the actual ODF parameters even when a Python ODF object was
+    # supplied directly; class names alone are insufficient ground truth for
+    # an inference dataset.
+    texture_metadata = odf.to_dict() if hasattr(odf, "to_dict") else config["texture"]
     result = {"image": _block_direct_beam(image, det_cfg["central_beam_blocker_fwhm_px"]),
               "orientations": orientations, "grains": grains, "peaks": peaks,
-              "metadata": {"configuration": config, "odf_class": type(odf).__name__}}
+              "metadata": {"configuration": config, "texture": texture_metadata,
+                           "odf_class": type(odf).__name__}}
     if save: result["files"] = _save_result(result, config)
     return result
 

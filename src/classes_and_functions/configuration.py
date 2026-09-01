@@ -9,6 +9,7 @@ from pathlib import Path
 DEFAULT_CONFIG = {
     "experiment": {
         "material": "Cu", "crystal_structure": "FCC", "lattice_parameter": 0.361,
+        "unit_cell": None, "max_hkl_index": 4,
         "wavelength": 0.0514, "num_grains": 100, "seed": 12345,
     },
     "grain": {
@@ -25,7 +26,7 @@ DEFAULT_CONFIG = {
         "shape_factor": 0.9, "instrumental_fwhm_px": 4.709640090061899,
         "intensity_scale": 1.0,
     },
-    "output": {"directory": "output", "prefix": "simulation"},
+    "output": {"directory": "output", "prefix": "simulation", "store_grains": True, "store_peaks": True},
 }
 
 
@@ -47,10 +48,22 @@ def validate_config(config):
     """Return complete validated config; input values use documented project units."""
     config = _merge(DEFAULT_CONFIG, config)
     experiment, grain, detector = config["experiment"], config["grain"], config["detector"]
-    if experiment["crystal_structure"].upper() not in {"SC", "FCC", "BCC", "HCP"}:
-        raise ValueError("experiment.crystal_structure must be SC, FCC, BCC, or HCP.")
+    structure = experiment["crystal_structure"].upper()
+    if structure not in {"SC", "FCC", "BCC", "HCP", "MONOCLINIC", "TRICLINIC"}:
+        raise ValueError("experiment.crystal_structure must be SC, FCC, BCC, HCP, MONOCLINIC, or TRICLINIC.")
     if experiment["num_grains"] < 1 or experiment["wavelength"] <= 0 or experiment["lattice_parameter"] <= 0:
         raise ValueError("num_grains, wavelength, and lattice_parameter must be positive.")
+    if not isinstance(experiment["max_hkl_index"], int) or experiment["max_hkl_index"] < 1:
+        raise ValueError("experiment.max_hkl_index must be a positive integer.")
+    unit_cell = experiment["unit_cell"]
+    if structure in {"MONOCLINIC", "TRICLINIC"}:
+        required = {"a", "b", "c", "alpha_deg", "beta_deg", "gamma_deg"}
+        if not isinstance(unit_cell, dict) or set(unit_cell) != required:
+            raise ValueError("MONOCLINIC/TRICLINIC experiments require unit_cell with a, b, c, alpha_deg, beta_deg, gamma_deg.")
+        if any(float(unit_cell[key]) <= 0 for key in ("a", "b", "c")):
+            raise ValueError("unit_cell lengths must be positive.")
+        if any(not 0 < float(unit_cell[key]) < 180 for key in ("alpha_deg", "beta_deg", "gamma_deg")):
+            raise ValueError("unit_cell angles must lie strictly between 0 and 180 degrees.")
     if grain["size_mean"] <= 0 or grain["size_std"] < 0 or grain["strain_std"] < 0 or grain["aspect_ratio"] <= 0:
         raise ValueError("Grain size/aspect ratio must be positive and standard deviations nonnegative.")
     if min(detector["width_px"], detector["height_px"], detector["distance_mm"], detector["pixel_size_mm"]) <= 0:

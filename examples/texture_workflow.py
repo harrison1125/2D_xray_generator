@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+ #!/usr/bin/env python3
 """Reproducible quaternion/ODF/diffraction demonstration for four textures."""
 from pathlib import Path
 import argparse

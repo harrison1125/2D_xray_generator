@@ -12,11 +12,14 @@ class GrainCubic:
     as they all convert into the reciprocal lattice. Any mistakes here will affect 
     the 2theta values. Strain is unitless. 
     '''    
-    def __init__(self, size_average, size_variance, strain_average, strain_variance, aspect_ratio, lattice_parameter, experiment):
+    def __init__(self, size_average, size_variance, strain_average, strain_variance, aspect_ratio, lattice_parameter, experiment,
+                 max_hkl_index=4):
         self.size_average = size_average 
         self.size_variance = size_variance 
         self.aspect_ratio = aspect_ratio
         self.sphere_range = math.floor(1 / experiment.wavelength)
+        self.max_hkl_index = int(max_hkl_index)
+        if self.max_hkl_index < 1: raise ValueError("max_hkl_index must be positive.")
         self.lattice_parameter = lattice_parameter 
         self.strain_average = strain_average 
         self.strain_variance = strain_variance
@@ -35,9 +38,9 @@ class GrainCubic:
             # if h**2 + k**2 + l**2 <= self.sphere_range**2  
             # Limiting sphere (Ewald Sphere constraint)
             (h, k, l)
-             for h in range(-4, 5)
-             for k in range(-4, 5)
-             for l in range(-4, 5)
+             for h in range(-self.max_hkl_index, self.max_hkl_index + 1)
+             for k in range(-self.max_hkl_index, self.max_hkl_index + 1)
+             for l in range(-self.max_hkl_index, self.max_hkl_index + 1)
 
 
         ]
@@ -113,7 +116,7 @@ class GrainGeneral:
     Lattice parameters: a, b, c and angles: alpha, beta, gamma (in degrees).
     '''
     def __init__(self, size_average, size_variance, strain_average, strain_variance,
-                 aspect_ratio, a, b, c, alpha, beta, gamma, experiment):
+                 aspect_ratio, a, b, c, alpha, beta, gamma, experiment, max_hkl_index=4):
 
         self.size_average = size_average 
         self.size_variance = size_variance 
@@ -133,13 +136,15 @@ class GrainGeneral:
         self.gamma = np.radians(gamma)
 
         self.sphere_range = math.floor(1 / experiment.wavelength)
+        self.max_hkl_index = int(max_hkl_index)
+        if self.max_hkl_index < 1: raise ValueError("max_hkl_index must be positive.")
 
         # Generate all integer (h, k, l) indices within the sphere range
         self.hkl_indices = [
             (h, k, l)
-            for h in range(-self.sphere_range, self.sphere_range + 1)
-            for k in range(-self.sphere_range, self.sphere_range + 1)
-            for l in range(-self.sphere_range, self.sphere_range + 1)
+            for h in range(-self.max_hkl_index, self.max_hkl_index + 1)
+            for k in range(-self.max_hkl_index, self.max_hkl_index + 1)
+            for l in range(-self.max_hkl_index, self.max_hkl_index + 1)
         ]
 
         # Generate reciprocal lattice vectors
@@ -156,12 +161,20 @@ class GrainGeneral:
             0
         ])
         cx = self.c * np.cos(self.beta)
-        cy = self.c * (np.cos(self.alpha) - np.cos(self.beta) * np.cos(self.gamma)) / np.sin(self.gamma)
-        cz = np.sqrt(self.c**2 - cx**2 - cy**2)
+        sin_gamma = np.sin(self.gamma)
+        if abs(sin_gamma) < 1e-12:
+            raise ValueError("Invalid unit cell: gamma produces a singular lattice basis.")
+        cy = self.c * (np.cos(self.alpha) - np.cos(self.beta) * np.cos(self.gamma)) / sin_gamma
+        cz_squared = self.c**2 - cx**2 - cy**2
+        if cz_squared <= 0:
+            raise ValueError("Invalid unit cell: lattice angles do not form a positive-volume cell.")
+        cz = np.sqrt(cz_squared)
         a3 = np.array([cx, cy, cz])
 
         # Volume of the real-space unit cell
         volume = np.dot(a1, np.cross(a2, a3))
+        if abs(volume) < np.finfo(float).eps:
+            raise ValueError("Invalid unit cell: zero real-space volume.")
 
         # Reciprocal lattice vectors
         b1 = np.cross(a2, a3) / volume

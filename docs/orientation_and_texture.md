@@ -22,6 +22,13 @@ specified crystal direction near the sample direction with the same finite
 angular Gaussian and has uniform spin around the fiber.  Mixtures combine
 normalized component densities by their weights.
 
+`PartialFiberODF` (also accepted as `sputter_fiber` or `offset_fiber` in JSON)
+extends a fiber with a tilted sample direction and controlled spin about the
+fiber. `spin_width_deg=180` gives a half-ring, while `spin_kappa>0` gives a
+smooth von-Mises lopsided ring. Spin modulation is normalized to preserve the
+ODF's Haar-measure normalization. Every supported ODF has `to_dict()` output,
+and object-supplied ODF parameters are retained in simulation metadata.
+
 Crystal symmetry is explicit and never silently baked into sampling.  Utilities
 provide the 24 proper cubic and 12 proper hexagonal operations,
 symmetry-equivalent orientations, and deterministic representative reduction.

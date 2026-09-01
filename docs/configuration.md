@@ -19,13 +19,24 @@ Configuration sections:
 - `grain`: equivalent-volume size mean/standard deviation, microstrain
   mean/standard deviation, and ellipsoid aspect ratio. Size and wavelength
   must use the same length unit.
-- `texture`: an ODF mapping: `random`, `sharp`, `component`, `fiber`, or
-  `mixture`. It uses the quaternion conventions described in
+- `texture`: an ODF mapping: `random`, `sharp`, `component`, `fiber`,
+  `partial_fiber` (aliases `sputter_fiber` and `offset_fiber`), `empirical`, or
+  `mixture`. Partial fibers support tilted growth directions, half-rings via
+  `spin_width_deg`, and smooth lopsidedness via `spin_kappa`. It uses the
+  quaternion conventions described in
   [orientation_and_texture.md](orientation_and_texture.md).
 - `detector`: pixel dimensions, physical distance/pixel pitch, Ewald tolerance,
   and central-beam blocker.
 - `scattering`: Scherrer shape factor, instrumental FWHM, and intensity scale.
 - `output`: result directory and filename prefix.
+
+`experiment.crystal_structure` supports `SC`, `FCC`, `BCC`, `HCP`,
+`MONOCLINIC`, and `TRICLINIC`. The low-symmetry paths require an explicit
+`unit_cell` object with `a`, `b`, `c`, `alpha_deg`, `beta_deg`, and `gamma_deg`;
+they use `GrainGeneral` rather than the cubic reciprocal lattice. Use
+`max_hkl_index` to control reciprocal-lattice truncation. `output.store_grains`
+and `output.store_peaks` may be set false for large batch datasets where exact
+ODF parameters are retained separately.
 
 The driver writes the detector image (`.tiff`, or `.npy` without `tifffile`),
 the complete resolved configuration, the realized grain sizes/strains/
