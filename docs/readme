@@ -1,13 +1,20 @@
-# 2D_X-ray_Generator
+# Current generator scope
 
-This project is an X-ray generator made for creating patterns for training machine-learning models. 
+The maintained data-generation path is the continuous sputter/PVD likelihood
+corpus in `configs/continuous_odf_sputter_pvd_broad.json`. It simulates
+film-normal fiber and biaxial growth motifs, with an explicit uniform channel
+for nanocrystalline or early-growth texture. See
+[continuous_odf_dataset.md](continuous_odf_dataset.md) for commands and
+[scientific_texture_space.md](scientific_texture_space.md) for the model.
 
-# Features
-Physics-informed XRD generation 
-Confocal beam calculation
-Noise inclusion
+The repository preserves lower-level texture classes and historical sampling
+modes for comparison and reproducibility, but they are not maintained dataset
+presets. New corpora should be written below `datasets/`; that location and all
+standard generated artifacts are ignored by Git.
 
-# Dependencies 
-Numpy
-Seaborn
-Matplotlib
+The diffraction renderer remains a simulator-development tool, not a
+calibrated experimental forward model. Quantitative inference requires
+sample-specific validation of structure factors, HCP/low-symmetry geometry,
+detector response, backgrounds, counting noise, and microstructure nuisance
+parameters. Interpret simulated posterior results as conditional on the
+declared generator distribution.

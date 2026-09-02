@@ -1,2 +1,0 @@
-{"run_id": "proof_random__case_000__r0000", "family": "proof_random", "case": "case_000", "replicate": 0, "seed": 3182215699, "status": "complete", "path": "datasets/texture_proof_v1/proof_random__case_000__r0000", "odf": {"type": "random"}, "num_grains": 250, "num_peaks": 6}
-{"run_id": "proof_random__case_000__r0001", "family": "proof_random", "case": "case_000", "replicate": 1, "seed": 3182215699, "status": "complete", "path": "datasets/texture_proof_v1/proof_random__case_000__r0001", "odf": {"type": "random"}, "num_grains": 250, "num_peaks": 6}

@@ -1,61 +1,73 @@
-Readme
-# Quaternion orientations and prescribed texture
+# XRD Generator
 
-The active simulator now accepts Haar-uniform or prescribed ODF grain
-orientations as unit quaternions.  See
-[orientation and texture documentation](docs/orientation_and_texture.md) and
-run `python examples/texture_workflow.py --grains 100 --seed 12345` for the
-random, sharp/single-component, fiber, and two-component end-to-end workflow.
-Per-grain ellipsoidal shape, peak broadening, and integrated intensity are
-documented in [grain_shape_and_intensity.md](docs/grain_shape_and_intensity.md).
-Use the single JSON-driven runner described in [configuration.md](docs/configuration.md)
-for reproducible experiments.
+This repository generates synthetic 2D X-ray diffraction patterns from
+quaternion grain orientations and analytic Orientation Distribution Functions
+(ODFs). The maintained dataset path is a sputter/PVD broad-likelihood corpus
+for Bayesian inverse inference; it models film-normal fiber texture, sharp
+biaxial growth, and a Haar-uniform nanocrystalline escape channel.
 
-## Synthetic texture datasets
+The simulator is suitable for controlled identifiability experiments. It is
+not yet a calibrated experimental forward model: material structure factors,
+instrument response, background, counting noise, and the sample-specific
+microstructure prior still require validation against standards.
 
-[`generate_texture_dataset.py`](src/driver_codes/generate_texture_dataset.py)
-executes long, resumable sweeps of explicitly specified ODF cases. A sweep JSON
-contains a `base_config`, a `families` array, and a `dataset` section:
+## Setup
 
 ```bash
-python src/driver_codes/generate_texture_dataset.py configs/texture_dataset_proof.json --dry-run
-python src/driver_codes/generate_texture_dataset.py configs/texture_dataset_proof.json
-python src/driver_codes/generate_texture_dataset.py configs/texture_dataset_broad.json --limit 10
+brew install uv
+uv venv .venv
+uv pip install -e .
 ```
 
-Each family contains named ODF `cases` and a `replicates` count. The runner
-assigns deterministic child seeds, writes one directory per run, and appends a
-`manifest.jsonl` record after every run. Re-running the command resumes from
-completed run IDs; use `--no-resume` only when deliberately regenerating them.
-The supplied specifications are:
+Run commands with `uv run`; this consistently uses the project environment.
 
-- `texture_dataset_proof.json`: a small smoke/proof corpus;
-- `texture_dataset_broad.json`: random, component, fiber, mixtures, offset
-  sputter fibers, and multiple-growth cases;
-- `texture_dataset_sputter.json`: sweeps of growth-direction tilt, arc width,
-  arc position, and smooth lopsidedness.
+## Maintained configurations
 
-The generated data are conditional synthetic simulations, not a comprehensive
-database of real texture. “Wide range” means coverage of the parameter values
-declared in the sweep, not coverage of all crystallographic materials,
-deposition mechanisms, instrument geometries, or possible ODFs. Each run's
-metadata records the resolved configuration, ODF parameters, seed, grain
-realizations, and peak records so that provenance and train/test partitioning
-can be audited.
+| Configuration | Purpose |
+|---|---|
+| `continuous_odf_sputter_pvd_broad.json` | Stage-1 PVD/sputter broad-likelihood ODF corpus: FCC Cu, BCC Fe, and HCP Ti. |
+| `curated_sputter_validation.json` | Small, interpretable Cu PVD validation sweeps for tilt, fiber arc width, and lopsidedness. |
+| `fcc_texture_grain_example.json` | Single-run FCC texture/grain simulation example. |
 
-For Bayesian inference, split by ODF parameter region/family and seed—not only
-by individual images—so interpolation and extrapolation can be measured. Keep
-an out-of-distribution real-data evaluation separate. A posterior over this
-corpus is conditional on the simulator; it should not be interpreted as a
-physical posterior until the forward model is calibrated against standards and
-real scans. In particular, the current diffraction path still uses the
-prototype crystal/ detector model documented in
-[configuration.md](docs/configuration.md), so HCP/non-cubic geometry,
-instrument backgrounds, counting noise, and material-specific scattering must
-be validated before scientific claims are made.
+Check the continuous corpus plan without generating data:
 
-For a non-categorical, continuous Sobol design over symmetry-invariant ODF
-mixtures, see [Continuous Sobol ODF dataset](docs/continuous_odf_dataset.md).
-It includes a cubic-versus-monoclinic proof configuration and a 50,000-samples-
-per-symmetry production specification, together with the mathematical and
-scientific-validity constraints of the generated corpus.
+```bash
+uv run src/driver_codes/generate_continuous_odf_dataset.py \
+  configs/continuous_odf_sputter_pvd_broad.json --dry-run
+```
+
+The production specification requests 10,000 ODFs for each crystal system,
+with one 6,000-grain observation per ODF. Start a staged run deliberately:
+
+```bash
+uv run src/driver_codes/generate_continuous_odf_dataset.py \
+  configs/continuous_odf_sputter_pvd_broad.json --limit 100
+```
+
+All dataset output belongs under `datasets/` and is ignored by Git. Each run is
+resumable through `manifest.jsonl`; do not use `--no-resume` against an
+existing corpus. See [the command reference](docs/texture_corpus_commands.md)
+for validation, sharding, and preview commands.
+
+## ODF targets and inference scope
+
+The continuous target is a variable-slot version-2 descriptor. With the PVD
+configuration's six component slots, it has 37 float32 values:
+
+```text
+[background (1), component weights (6), centers wxyz (24), FWHM degrees (6)]
+```
+
+Use the run's `odf_label_schema.json`, not hard-coded offsets. Metadata records
+the analytic texture index $J$, active-slot mask, component origin tag, and
+process family. The PVD sampler uses the intended per-component allocation:
+65% `sputter_fiber`, 20% `sputter_biaxial`, and 15%
+`nanocrystalline_uniform`.
+
+The physical construction and its limitations are documented in
+[scientific_texture_space.md](docs/scientific_texture_space.md). In particular,
+a finite mixture along a film-normal fiber approximates, but is not identical
+to, a continuous axisymmetric fiber ODF. A posterior learned from this corpus
+is conditional on this generator distribution; use experimentally derived
+information such as EBSD as an explicit prior or comparison distribution,
+rather than treating the corpus as universal texture support.

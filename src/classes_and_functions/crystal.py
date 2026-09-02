@@ -6,6 +6,22 @@ from .orientation import (canonicalize_quaternion, quaternion_to_rotation_matrix
 from .grain_scattering import ellipsoid_volume
 from .experiment import Experiment
 
+
+def _sample_positive_size(mean, variance, distribution, rng):
+    """Sample a positive equivalent diameter with arithmetic mean/variance."""
+    if variance == 0:
+        return float(mean)
+    if distribution == "lognormal":
+        sigma_squared = np.log1p(variance / mean**2)
+        mu = np.log(mean) - 0.5 * sigma_squared
+        return float(rng.lognormal(mu, np.sqrt(sigma_squared)))
+    if distribution == "normal":
+        # Kept for legacy callers. Configured runs default to a log-normal law,
+        # which is positive without an arbitrary clipping operation.
+        return float(max(np.finfo(float).eps, rng.normal(mean, np.sqrt(variance))))
+    raise ValueError("size_distribution must be 'lognormal' or 'normal'.")
+
+
 class GrainCubic:
     ''' 
     grain size, lattice parameter, and wavelength need to have the same units, 
@@ -13,10 +29,12 @@ class GrainCubic:
     the 2theta values. Strain is unitless. 
     '''    
     def __init__(self, size_average, size_variance, strain_average, strain_variance, aspect_ratio, lattice_parameter, experiment,
-                 max_hkl_index=4):
+                 max_hkl_index=4, size_distribution="normal", length_to_microns=1e-3):
         self.size_average = size_average 
         self.size_variance = size_variance 
         self.aspect_ratio = aspect_ratio
+        self.size_distribution = size_distribution
+        self.length_to_microns = float(length_to_microns)
         self.sphere_range = math.floor(1 / experiment.wavelength)
         self.max_hkl_index = int(max_hkl_index)
         if self.max_hkl_index < 1: raise ValueError("max_hkl_index must be positive.")
@@ -27,7 +45,8 @@ class GrainCubic:
         self.grain_size = size_average
         self.grain_strain = strain_average
         self.volume = ellipsoid_volume(size_average)
-        self.reference_volume = self.volume
+        self.volume_um3 = ellipsoid_volume(size_average * self.length_to_microns)
+        self.reference_volume = self.volume  # legacy API; intensity now uses physical µm³
 
         # HKL indices for bookkeeping (used later for structure factor calculations)
         self.hkl_indices = [
@@ -68,7 +87,9 @@ class GrainCubic:
     def randomize_grain_size(self, rng=None):
         # Edit: Changed "grain.size_average" to "self.size_average"
         # should always refer to the instance's attribute, allowing for multiple grains (reusability)
-        return (np.random.default_rng() if rng is None else rng).normal(self.size_average, np.sqrt(self.size_variance))
+        rng = np.random.default_rng() if rng is None else rng
+        return _sample_positive_size(self.size_average, self.size_variance,
+                                     self.size_distribution, rng)
     
     def randomize_grain_strain(self, rng=None):
         # Edit: Changed "grain.strain_average" to "self.strain_average"
@@ -93,10 +114,10 @@ class GrainCubic:
     def realize_properties(self, rng=None):
         """Sample and retain this grain's size, strain, and volume."""
         rng = np.random.default_rng() if rng is None else rng
-        # A normal distribution can produce a nonphysical negative tail.
-        self.grain_size = max(np.finfo(float).eps, self.randomize_grain_size(rng))
+        self.grain_size = self.randomize_grain_size(rng)
         self.grain_strain = self.randomize_grain_strain(rng)
         self.volume = ellipsoid_volume(self.grain_size)
+        self.volume_um3 = ellipsoid_volume(self.grain_size * self.length_to_microns)
         return self.grain_size, self.grain_strain
 
     def randomize_properties(self, rng=None):
@@ -116,17 +137,21 @@ class GrainGeneral:
     Lattice parameters: a, b, c and angles: alpha, beta, gamma (in degrees).
     '''
     def __init__(self, size_average, size_variance, strain_average, strain_variance,
-                 aspect_ratio, a, b, c, alpha, beta, gamma, experiment, max_hkl_index=4):
+                 aspect_ratio, a, b, c, alpha, beta, gamma, experiment, max_hkl_index=4,
+                 size_distribution="normal", length_to_microns=1e-3):
 
         self.size_average = size_average 
         self.size_variance = size_variance 
-        self.aspect_ratio = aspect_ratio  # still unused
+        self.aspect_ratio = aspect_ratio
+        self.size_distribution = size_distribution
+        self.length_to_microns = float(length_to_microns)
         self.strain_average = strain_average 
         self.strain_variance = strain_variance
         self.grain_size = size_average
         self.grain_strain = strain_average
         self.volume = ellipsoid_volume(size_average)
-        self.reference_volume = self.volume
+        self.volume_um3 = ellipsoid_volume(size_average * self.length_to_microns)
+        self.reference_volume = self.volume  # legacy API; intensity now uses physical µm³
 
         self.a = a
         self.b = b
@@ -190,7 +215,9 @@ class GrainGeneral:
         return reciprocal_vectors
 
     def randomize_grain_size(self, rng=None):
-        return (np.random.default_rng() if rng is None else rng).normal(self.size_average, np.sqrt(self.size_variance))
+        rng = np.random.default_rng() if rng is None else rng
+        return _sample_positive_size(self.size_average, self.size_variance,
+                                     self.size_distribution, rng)
     
     def randomize_grain_strain(self, rng=None):
         return (np.random.default_rng() if rng is None else rng).normal(self.strain_average, np.sqrt(self.strain_variance))
@@ -209,9 +236,10 @@ class GrainGeneral:
 
     def realize_properties(self, rng=None):
         rng = np.random.default_rng() if rng is None else rng
-        self.grain_size = max(np.finfo(float).eps, self.randomize_grain_size(rng))
+        self.grain_size = self.randomize_grain_size(rng)
         self.grain_strain = self.randomize_grain_strain(rng)
         self.volume = ellipsoid_volume(self.grain_size)
+        self.volume_um3 = ellipsoid_volume(self.grain_size * self.length_to_microns)
         return self.grain_size, self.grain_strain
 
 if __name__ == "__main__":

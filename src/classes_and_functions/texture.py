@@ -278,7 +278,9 @@ def get_symmetry_operations(crystal):
     if crystal in {"monoclinic", "2/m", "c2h"}:
         # Orientation symmetry uses the proper rotational subgroup.  The
         # inversion/mirror elements of 2/m are improper and do not add an
-        # SO(3) orientation operation; the remaining C2 is taken about c.
+        # SO(3) orientation operation; the existing simulator convention takes
+        # the remaining C2 about Cartesian crystal-frame z.  For a skew cell,
+        # this must not be assumed to equal its direct-lattice c vector.
         return canonicalize_quaternion(np.array([
             [1., 0., 0., 0.], axis_angle_to_quaternion([0, 0, 1], np.pi),
         ]))

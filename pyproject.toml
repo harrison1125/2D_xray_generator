@@ -7,7 +7,7 @@ readme = "README.md"
 packages = [{ include = "src" }]
 
 [tool.poetry.dependencies]
-python = "^3.11, <=3.12"
+python = ">=3.11,<3.13"
 numpy = '*'
 seaborn = '*'
 matplotlib = '*'
@@ -15,6 +15,7 @@ scipy = '*'
 imageio = "^2.37.0"
 pillow = "^11.3.0"
 tifffile = "^2025.6.11"
+h5py = "^3.13.0"
 
 [tool.poetry.scripts]
 xrd-generate = "src.driver_codes.run_experiment:main"

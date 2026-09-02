@@ -12,7 +12,13 @@ class EwaldSphere:
         self.grain = grain
 
     def filter_points(self):
-        """Filters reciprocal lattice points that satisfy diffraction conditions."""
+        """Return candidate reciprocal points and their Ewald excitation error.
+
+        ``tolerance`` is only a computational candidate window. The detector
+        applies a finite-size line-profile weight to the continuous excitation
+        error, so tolerance no longer acts as a flat, arbitrary diffraction
+        probability within the shell.
+        """
         distances = np.linalg.norm(
             self.grain.reciprocal_lattice_vectors - self.center, axis=1
         )
@@ -21,6 +27,7 @@ class EwaldSphere:
         )
         vectors = self.grain.reciprocal_lattice_vectors[mask]
         hkls = np.array(self.grain.hkl_indices)[mask]
+        excitation_error = np.abs(distances[mask] - self.radius)[:, None]
 
         # Ensure both arrays are 2D
-        return np.hstack((vectors, hkls))
+        return np.hstack((vectors, hkls, excitation_error))

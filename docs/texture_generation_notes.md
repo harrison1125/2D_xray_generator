@@ -24,10 +24,10 @@ hard-coded around one texture type such as a simple fiber texture.
 
 ## What is in place
 
-The codebase now contains support for both the older named texture objects and
+The codebase now contains support for both the curated texture-validation objects and
 the newer continuous ODF sampling path.
 
-### Existing named texture machinery
+### Existing curated texture-validation machinery
 
 The existing texture system includes:
 
@@ -215,6 +215,13 @@ Each simulated sample should retain:
 - The full simulation configuration.
 
 That metadata is the real ground truth. The XRD image is the observation.
+
+Curated texture-validation corpora also mirror every scientific image into one flat
+`png_preview/` directory. The PNG filename is the run ID, so macOS Preview can
+open and scroll the complete corpus in deterministic alphabetical order. These
+8-bit images use a documented per-image logarithmic display transform for QA;
+all fitting, training, and quantitative checks must use the source TIFF/NumPy
+array.
 
 If harmonic coefficients are written out, they should be treated as a compact
 representation or diagnostic representation, not as a substitute for the

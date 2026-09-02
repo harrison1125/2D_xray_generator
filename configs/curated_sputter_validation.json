@@ -1,0 +1,25 @@
+{
+  "dataset": {"output_directory": "datasets/curated_sputter_validation_v1", "seed": 20260902, "write_png_previews": true, "png_preview_directory": "png_preview", "png_saturation_percentile": 99.5},
+  "base_config": {
+    "experiment": {"material": "Cu", "crystal_structure": "FCC", "lattice_parameter": 0.361, "wavelength": 0.0514, "num_grains": 2000},
+    "grain": {"size_mean": 33500.0, "size_std": 5750.0, "size_unit": "nm", "size_distribution": "lognormal", "strain_mean": 0.0, "strain_std": 0.0001, "aspect_ratio": 1.5},
+    "detector": {"width_px": 1000, "height_px": 1000, "distance_mm": 86.0, "pixel_size_mm": 0.075, "ewald_tolerance": 0.1, "bin_to_width_px": 256, "bin_to_height_px": 256, "central_beam_blocker_fwhm_px": 5.0}
+  },
+  "families": [
+    {"name": "tilt_sweep", "replicates": 8, "cases": [
+      {"type": "partial_fiber", "crystal_direction": [1, 1, 1], "sample_direction": [0.0872, 0, 0.9962], "spread_deg": 5, "spin_width_deg": 360},
+      {"type": "partial_fiber", "crystal_direction": [1, 1, 1], "sample_direction": [0.2588, 0, 0.9659], "spread_deg": 5, "spin_width_deg": 360},
+      {"type": "partial_fiber", "crystal_direction": [1, 1, 1], "sample_direction": [0.4226, 0, 0.9063], "spread_deg": 8, "spin_width_deg": 360}
+    ]},
+    {"name": "arc_sweep", "replicates": 8, "cases": [
+      {"type": "partial_fiber", "crystal_direction": [1, 1, 1], "sample_direction": [0.2, 0, 0.9799], "spread_deg": 6, "spin_center_deg": 0, "spin_width_deg": 270},
+      {"type": "partial_fiber", "crystal_direction": [1, 1, 1], "sample_direction": [0.2, 0, 0.9799], "spread_deg": 6, "spin_center_deg": 45, "spin_width_deg": 180},
+      {"type": "partial_fiber", "crystal_direction": [1, 1, 1], "sample_direction": [0.2, 0, 0.9799], "spread_deg": 6, "spin_center_deg": 90, "spin_width_deg": 90}
+    ]},
+    {"name": "lopsidedness_sweep", "replicates": 8, "cases": [
+      {"type": "partial_fiber", "crystal_direction": [1, 1, 1], "sample_direction": [0.2, 0, 0.9799], "spread_deg": 7, "spin_center_deg": 30, "spin_kappa": 0.5},
+      {"type": "partial_fiber", "crystal_direction": [1, 1, 1], "sample_direction": [0.2, 0, 0.9799], "spread_deg": 7, "spin_center_deg": 30, "spin_kappa": 2.5},
+      {"type": "partial_fiber", "crystal_direction": [1, 1, 1], "sample_direction": [0.2, 0, 0.9799], "spread_deg": 7, "spin_center_deg": 30, "spin_kappa": 8.0}
+    ]}
+  ]
+}

@@ -1,5 +1,36 @@
+# Generated XRD corpora and simulation exports. Historical data already
+# committed remains in Git history; every future generator iteration is local.
+/datasets/
+/output/
+/outputs/
+/generated/
+/results/
+**/manifest.jsonl
+**/dataset_spec.json
+**/odf_label_schema.json
+**/metadata.h5
+**/planned_scan_index.npz
+**/odf_labels.npz
+**/odf_label.npz
+**/sobol_design.npy
+**/odf_grid_quaternions.npy
+**/png_preview/
+**/simulation_pattern.npy
+**/simulation_pattern.tiff
+**/*_metadata.json
+**/*_grains.json
+**/*_peaks.json
+
+# Local scientific arrays and image exports, including ad-hoc runs outside a
+# standard corpus directory. Intentional binary fixtures can still be added
+# explicitly with `git add -f`.
+*.npy
+*.npz
+*.h5
+*.hdf5
+*.tif
 *.tiff
-*.json
+.DS_Store
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

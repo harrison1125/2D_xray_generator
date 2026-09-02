@@ -16,8 +16,9 @@ from src.classes_and_functions.texture import (
 )
 from src.driver_codes.Simulation_Gaussian_Broadening import run_experiment
 from src.classes_and_functions.continuous_odf import (
-    SobolODFSpace, dvp_exponent_from_fwhm, dvp_log_normalization,
-    harmonic_coefficients, sobol_unit_cube,
+    ContinuousSymmetricMixtureODF, PhysicalTextureSpace, SobolODFSpace,
+    dvp_exponent_from_fwhm, dvp_log_normalization, harmonic_coefficients,
+    orientation_from_plane_direction, sobol_unit_cube,
 )
 
 
@@ -114,6 +115,46 @@ def test_continuous_odf_normalization_symmetry_and_sobol_determinism():
     assert get_symmetry_operations("monoclinic").shape == (2, 4)
 
 
+def test_analytic_texture_index_and_physical_manifold_mapping():
+    exponent = float(dvp_exponent_from_fwhm(25.0))
+    component = ContinuousSymmetricMixtureODF(
+        [[1, 0, 0, 0]], [25.0], [1.0], 0.0, "triclinic"
+    )
+    expected = float(np.exp(
+        2 * dvp_log_normalization(exponent) - dvp_log_normalization(2 * exponent)
+    ))
+    assert np.isclose(component.texture_index(), expected, rtol=2e-12)
+
+    copper = orientation_from_plane_direction([1, 1, 2], [1, 1, -1])
+    matrix = quaternion_to_rotation_matrix(copper)
+    assert np.allclose(matrix @ (np.array([1, 1, -1]) / np.sqrt(3)), [1, 0, 0])
+    assert np.allclose(matrix @ (np.array([1, 1, 2]) / np.sqrt(6)), [0, 0, 1])
+
+    space = PhysicalTextureSpace("cubic", process_family="rolling")
+    points = sobol_unit_cube(32, space.dimension, seed=121)
+    decoded = [space.decode(point) for point in points]
+    assert all(np.isfinite(odf.texture_index()) and odf.texture_index() >= 1
+               for odf, _ in decoded)
+    assert np.median([odf.effective_components for odf, _ in decoded]) < 3.5
+    assert any("fiber" in name
+               for _, metadata in decoded for name in metadata["component_manifold"])
+    assert any("uniform_so3_escape" in metadata["component_manifold"]
+               for _, metadata in decoded)
+
+    low_symmetry = PhysicalTextureSpace(
+        "monoclinic", process_family="rolling", uniform_center_fraction=0.0
+    )
+    low_odf, low_metadata = low_symmetry.decode(
+        sobol_unit_cube(1, low_symmetry.dimension, seed=122)[0]
+    )
+    assert all(name.startswith("crystal_") for name in low_metadata["component_manifold"])
+    query = uniform_quaternions(6, np.random.default_rng(123))
+    equivalents = np.array([
+        compose_rotations(item, get_symmetry_operations("monoclinic")) for item in query
+    ])
+    assert np.allclose(low_odf.evaluate(equivalents), low_odf.evaluate(query)[:, None])
+
+
 def test_grain_shape_and_size_control_peak_width_and_intensity():
     grain = GrainCubic(1000, 0, 0.001, 0, 2.0, 3.6, Experiment(.1, "test"))
     grain.grain_size, grain.grain_strain = 1000., .001
@@ -152,5 +193,6 @@ class TestOrientationTexture(unittest.TestCase):
     def test_symmetry_and_grain(self): test_symmetry_and_grain_rotation_preserve_reciprocal_lengths()
     def test_partial_fiber(self): test_partial_fiber_serialization_and_offset_sampling()
     def test_continuous_odf(self): test_continuous_odf_normalization_symmetry_and_sobol_determinism()
+    def test_physical_manifold(self): test_analytic_texture_index_and_physical_manifold_mapping()
     def test_shape_and_intensity(self): test_grain_shape_and_size_control_peak_width_and_intensity()
     def test_configuration(self): test_configuration_drives_texture_and_grain_realizations()
