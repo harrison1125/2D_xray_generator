@@ -25,14 +25,16 @@ Run commands with `uv run`; this consistently uses the project environment.
 
 | Configuration | Purpose |
 |---|---|
+| `balanced_symmetry_odf_pf_v1.json` | Matched 25k-per-class FCC/BCC/HCP benchmark with analytic ODF and realized PF/IPF targets. |
 | `continuous_odf_sputter_pvd_broad.json` | Stage-1 PVD/sputter broad-likelihood ODF corpus: FCC Cu, BCC Fe, and HCP Ti. |
+| `continuous_odf_phase_space_v2.json` | Unconstrained phase-space corpus for FCC Cu, BCC Fe, and HCP Ti; reproduces the prior PNG/TIFF layout. |
 | `curated_sputter_validation.json` | Small, interpretable Cu PVD validation sweeps for tilt, fiber arc width, and lopsidedness. |
 | `fcc_texture_grain_example.json` | Single-run FCC texture/grain simulation example. |
 
 Check the continuous corpus plan without generating data:
 
 ```bash
-uv run src/driver_codes/generate_continuous_odf_dataset.py \
+uv run --no-sync src/driver_codes/generate_continuous_odf_dataset.py \
   configs/continuous_odf_sputter_pvd_broad.json --dry-run
 ```
 
@@ -40,7 +42,7 @@ The production specification requests 10,000 ODFs for each crystal system,
 with one 6,000-grain observation per ODF. Start a staged run deliberately:
 
 ```bash
-uv run src/driver_codes/generate_continuous_odf_dataset.py \
+uv run --no-sync src/driver_codes/generate_continuous_odf_dataset.py \
   configs/continuous_odf_sputter_pvd_broad.json --limit 100
 ```
 

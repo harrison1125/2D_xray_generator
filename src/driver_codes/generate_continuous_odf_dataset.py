@@ -39,10 +39,32 @@ from src.classes_and_functions.continuous_odf import (
     PhysicalTextureSpace, SobolODFSpace, harmonic_coefficients,
     pack_harmonic_coefficients, sobol_odf_grid, sobol_unit_cube,
 )
+from src.classes_and_functions.directional_targets import write_directional_targets
 from src.driver_codes.Simulation_Gaussian_Broadening import run_experiment
 
 
 ODF_LABEL_VERSION = "continuous_symmetric_dvp_mixture_v1"
+
+
+# These arrays are written beside the immutable ODF descriptors.  Keeping them
+# in the label table lets a resumed corpus reuse the already-validated physical
+# design instead of repeating the expensive analytic texture-index calculation
+# merely to recreate auxiliary provenance fields.
+_DESIGN_METADATA_FIELDS = (
+    "texture_index",
+    "texture_index_log_weight",
+    "sampling_space",
+    "inference_mode",
+    "process_family",
+    "sample_process_domain",
+    "component_manifold",
+    "component_manifold_kind",
+    "component_process_tag",
+    "active_component_count",
+    "component_active_mask",
+    "dirichlet_concentration",
+    "design_candidate_index",
+)
 
 
 def _descriptor_fields(component_count: int) -> dict[str, list[int]]:
@@ -216,6 +238,45 @@ def _representation_mode(run: dict) -> tuple[bool, bool]:
     return "odf_grid" in mode, "harmonic" in mode
 
 
+def _directional_target_settings(run: dict, system: dict) -> dict | None:
+    settings = run.get("directional_targets")
+    if settings is None:
+        return None
+    if not isinstance(settings, dict):
+        raise ValueError("run.directional_targets must be an object.")
+    if not settings.get("enabled", False):
+        return None
+    if settings.get("source", "observation_orientations") != "observation_orientations":
+        raise ValueError("directional_targets.source currently supports observation_orientations only.")
+    grid_size = int(settings.get("grid_size", 32))
+    coefficient_shape = tuple(map(int, settings.get("coefficient_shape", (9, 9))))
+    sample_directions = settings.get("sample_directions", [
+        {"name": "RD", "direction": [1, 0, 0]},
+        {"name": "TD", "direction": [0, 1, 0]},
+        {"name": "ND", "direction": [0, 0, 1]},
+    ])
+    pole_families = system.get("pole_families")
+    if grid_size < 4 or len(coefficient_shape) != 2 or min(coefficient_shape) < 1:
+        raise ValueError("directional target grid/coefficient dimensions are invalid.")
+    if not isinstance(pole_families, list) or not pole_families:
+        raise ValueError(f"{system['name']} requires nonempty pole_families.")
+    if not isinstance(sample_directions, list) or not sample_directions:
+        raise ValueError("directional_targets.sample_directions must be a nonempty list.")
+    for family in pole_families:
+        if set(family) != {"name", "hkl"} or len(family["hkl"]) != 3:
+            raise ValueError("Each pole family must contain only name and three-index hkl.")
+    for direction in sample_directions:
+        if set(direction) != {"name", "direction"} or len(direction["direction"]) != 3:
+            raise ValueError("Each sample direction must contain only name and direction.")
+    return {
+        "filename": "pf_ipf_targets.npz",
+        "grid_size": grid_size,
+        "coefficient_shape": coefficient_shape,
+        "sample_directions": sample_directions,
+        "pole_families": pole_families,
+    }
+
+
 def odf_descriptor(odf) -> np.ndarray:
     """Return the canonical fixed-width, directly ingestible ODF label."""
     return np.concatenate((
@@ -288,7 +349,7 @@ def planned_runs(spec: dict) -> int:
 
 def _label_schema(spec: dict) -> dict:
     component_count = int(spec["run"].get("max_texture_components", 5))
-    return {
+    schema = {
         "label_version": _label_version(component_count),
         "descriptor_length": _descriptor_length(component_count),
         "descriptor_dtype": "float32",
@@ -325,6 +386,32 @@ def _label_schema(spec: dict) -> dict:
             "Texture index and sampler provenance are auxiliary variables; five-slot corpora retain the backward-compatible 31-value v1 descriptor.",
         ],
     }
+    directional = spec["run"].get("directional_targets", {})
+    if directional.get("enabled", False):
+        coefficient_shape = directional.get("coefficient_shape", [9, 9])
+        schema["directional_targets"] = {
+            "target_version": "realized_pf_ipf_lambert_dct_v1",
+            "path_field": "pf_ipf_path",
+            "target_source": "exact finite grain orientations used to render each observation",
+            "projection": "normalized Lambert equal-area upper hemisphere with antipodal folding",
+            "grid_size": int(directional.get("grid_size", 32)),
+            "coefficient_basis": "orthonormal 2-D DCT-II, low-frequency rectangular prefix",
+            "coefficient_shape": list(map(int, coefficient_shape)),
+            "channel_order": "configured PF families followed by configured sample-direction IPFs",
+            "systems": [
+                {"name": system["name"], "pole_families": system["pole_families"]}
+                for system in spec["crystal_systems"]
+            ],
+            "sample_directions": directional.get("sample_directions", [
+                {"name": "RD", "direction": [1, 0, 0]},
+                {"name": "TD", "direction": [0, 1, 0]},
+                {"name": "ND", "direction": [0, 0, 1]},
+            ]),
+        }
+        schema["notes"].append(
+            "PF/IPF targets describe the finite orientation realization for each observation; the analytic mixture descriptor remains the full-ODF target."
+        )
+    return schema
 
 
 def _write_json_exact(path: Path, value: dict) -> None:
@@ -376,10 +463,46 @@ def _write_system_label_table(path: Path, points: np.ndarray, space,
     np.savez_compressed(path, **arrays)
 
 
+def _load_stored_design(design_path: Path, label_path: Path, *, num_samples: int,
+                        dimension: int, component_count: int) -> tuple[np.ndarray, dict[str, np.ndarray]] | None:
+    """Load a complete persisted physical design for a resumable corpus.
+
+    Both files are required: the raw Sobol coordinates establish the sampling
+    design, while the label table contains the expensive analytic diagnostics
+    and process provenance derived from those coordinates.  A partial pair is
+    deliberately rebuilt rather than silently trusted.
+    """
+    if not design_path.exists() or not label_path.exists():
+        return None
+    points = np.load(design_path)
+    if points.shape != (num_samples, dimension):
+        raise ValueError(
+            f"Existing {design_path} has incompatible shape {points.shape}; "
+            f"expected {(num_samples, dimension)}."
+        )
+    expected_version = _label_version(component_count)
+    with np.load(label_path, allow_pickle=False) as labels:
+        missing = [name for name in _DESIGN_METADATA_FIELDS if name not in labels]
+        if missing:
+            # Older corpus versions predate the persisted provenance fields.
+            # Rebuild their design below to retain backward-compatible resume
+            # behavior; current corpus versions take the fast cached path.
+            return None
+        if (labels["sobol_point"].shape != points.shape
+                or not np.array_equal(labels["sobol_point"], points)
+                or str(labels["label_version"]) != expected_version):
+            raise ValueError(f"Existing {label_path} does not match {design_path}.")
+        metadata = {name: labels[name].copy() for name in _DESIGN_METADATA_FIELDS}
+    if any(value.shape[0] != num_samples for value in metadata.values()):
+        raise ValueError(f"Existing {label_path} has incompatible design metadata shapes.")
+    return points, metadata
+
+
 def _write_scan_index(output_root: Path, systems_data: list[dict], counts: tuple[int, ...],
                       image_format: str) -> None:
     """Write a flat scan/label lookup table suitable for a dataset loader."""
-    run_ids, odf_ids, sample_dirs, image_paths = [], [], [], []
+    run_ids, odf_ids, design_pair_ids = [], [], []
+    sample_dirs, image_paths, pf_ipf_paths = [], [], []
     system_indices, label_indices, grain_values, observation_indices, descriptors = [], [], [], [], []
     texture_indices, texture_log_weights = [], []
     sampling_spaces, inference_modes, process_families, sample_process_domains = [], [], [], []
@@ -389,43 +512,65 @@ def _write_scan_index(output_root: Path, systems_data: list[dict], counts: tuple
         name = item["name"]
         with np.load(item["label_path"]) as labels:
             label_descriptors = labels["descriptor"]
+            # ``NpzFile`` reads its compressed members lazily.  Cache every
+            # member used below once: indexing ``labels[name][sample_index]``
+            # in this loop re-decompresses the entire member for every ODF and
+            # turns a 30,000-row scan index into a many-minute initialization.
+            optional = {
+                field: labels[field] if field in labels else None
+                for field in (
+                    "texture_index", "texture_index_log_weight", "sampling_space",
+                    "inference_mode", "process_family", "sample_process_domain",
+                    "component_process_tag", "active_component_count",
+                    "component_active_mask",
+                )
+            }
             for sample_index in range(len(item["points"])):
                 odf_id = f"{name}__odf_{sample_index:06d}"
                 for observation_index, count in enumerate(counts):
                     run_id = f"{odf_id}__g{count:06d}"
                     relative_dir = Path(name) / run_id
                     run_ids.append(run_id); odf_ids.append(odf_id)
+                    design_pair_ids.append(
+                        f"paired_sobol_{sample_index:06d}"
+                        if item["paired_design"] else odf_id
+                    )
                     sample_dirs.append(str(relative_dir))
                     image_paths.append(str(relative_dir / f"simulation_pattern{image_suffix}"))
+                    pf_ipf_paths.append(
+                        str(relative_dir / item["directional_targets"]["filename"])
+                        if item["directional_targets"] is not None else ""
+                    )
                     system_indices.append(system_index); label_indices.append(sample_index)
                     grain_values.append(count); observation_indices.append(observation_index)
                     descriptors.append(label_descriptors[sample_index])
-                    texture_indices.append(float(labels["texture_index"][sample_index])
-                                           if "texture_index" in labels else np.nan)
-                    texture_log_weights.append(float(labels["texture_index_log_weight"][sample_index])
-                                               if "texture_index_log_weight" in labels else 0.0)
-                    sampling_spaces.append(str(labels["sampling_space"][sample_index])
-                                           if "sampling_space" in labels else "legacy_sobol_hypercube")
-                    inference_modes.append(str(labels["inference_mode"][sample_index])
-                                           if "inference_mode" in labels else "legacy")
-                    process_families.append(str(labels["process_family"][sample_index])
-                                            if "process_family" in labels else "unconstrained")
-                    sample_process_domains.append(str(labels["sample_process_domain"][sample_index])
-                                                  if "sample_process_domain" in labels else "unconstrained")
+                    texture_indices.append(float(optional["texture_index"][sample_index])
+                                           if optional["texture_index"] is not None else np.nan)
+                    texture_log_weights.append(float(optional["texture_index_log_weight"][sample_index])
+                                               if optional["texture_index_log_weight"] is not None else 0.0)
+                    sampling_spaces.append(str(optional["sampling_space"][sample_index])
+                                           if optional["sampling_space"] is not None else "legacy_sobol_hypercube")
+                    inference_modes.append(str(optional["inference_mode"][sample_index])
+                                           if optional["inference_mode"] is not None else "legacy")
+                    process_families.append(str(optional["process_family"][sample_index])
+                                            if optional["process_family"] is not None else "unconstrained")
+                    sample_process_domains.append(str(optional["sample_process_domain"][sample_index])
+                                                  if optional["sample_process_domain"] is not None else "unconstrained")
                     component_process_tags.append(
-                        labels["component_process_tag"][sample_index]
-                        if "component_process_tag" in labels else np.asarray([], dtype=str)
+                        optional["component_process_tag"][sample_index]
+                        if optional["component_process_tag"] is not None else np.asarray([], dtype=str)
                     )
                     active_component_counts.append(
-                        int(labels["active_component_count"][sample_index])
-                        if "active_component_count" in labels else -1
+                        int(optional["active_component_count"][sample_index])
+                        if optional["active_component_count"] is not None else -1
                     )
                     component_active_masks.append(
-                        labels["component_active_mask"][sample_index]
-                        if "component_active_mask" in labels else np.asarray([], dtype=bool)
+                        optional["component_active_mask"][sample_index]
+                        if optional["component_active_mask"] is not None else np.asarray([], dtype=bool)
                     )
     arrays = {
         "run_id": np.asarray(run_ids), "odf_id": np.asarray(odf_ids),
+        "design_pair_id": np.asarray(design_pair_ids),
         "sample_directory": np.asarray(sample_dirs), "image_path": np.asarray(image_paths),
         "system_index": np.asarray(system_indices, dtype=np.int16),
         "odf_label_index": np.asarray(label_indices, dtype=np.int32),
@@ -442,6 +587,8 @@ def _write_scan_index(output_root: Path, systems_data: list[dict], counts: tuple
         "active_component_count": np.asarray(active_component_counts, dtype=np.int16),
         "component_active_mask": np.asarray(component_active_masks, dtype=bool),
     }
+    if any(pf_ipf_paths):
+        arrays["pf_ipf_path"] = np.asarray(pf_ipf_paths)
     path = output_root / "planned_scan_index.npz"
     if path.exists():
         with np.load(path) as existing:
@@ -481,6 +628,8 @@ def _write_hdf5_metadata(output_root: Path, spec: dict, systems_data: list[dict]
     if not index_path.exists():
         raise FileNotFoundError(f"Cannot create HDF5 metadata without {index_path}.")
     target = output_root / "metadata.h5"
+    if target.exists():
+        return
     temporary = output_root / "metadata.h5.tmp"
     if temporary.exists():
         temporary.unlink()
@@ -748,26 +897,54 @@ def generate(spec: dict, *, limit: int | None = None, resume: bool = True,
     if image_format == "auto":
         raise ValueError("Continuous corpora require explicit output.image_format for a stable scan index.")
     systems_data = []
+    paired_design = bool(run.get("paired_design_across_systems", False))
+    paired_observations = bool(run.get("paired_observation_noise_across_systems", False))
+    initialization_started = time.monotonic()
+    print(
+        f"[progress] initializing {len(spec['crystal_systems'])} system designs "
+        f"({num_samples} ODFs per system)",
+        flush=True,
+    )
     for system_index, system in enumerate(spec["crystal_systems"]):
         name = _safe_name(system["name"])
         symmetry = system["orientation_symmetry"]
         space = _make_odf_space(run, system)
+        if paired_design and systems_data and space.dimension != systems_data[0]["space"].dimension:
+            raise ValueError("paired_design_across_systems requires equal sampling-space dimensions.")
+        directional_settings = _directional_target_settings(run, system)
         system_dir = output_root / name
         system_dir.mkdir(parents=True, exist_ok=True)
-        points, design_metadata = _build_design(
-            num_samples, space,
-            seed=int(np.random.SeedSequence(design_seed, spawn_key=(system_index,)).generate_state(1)[0]),
-            run=run, system=system,
-        )
         design_path = system_dir / "sobol_design.npy"
-        if design_path.exists():
-            existing_design = np.load(design_path)
-            if existing_design.shape != points.shape or not np.array_equal(existing_design, points):
-                raise ValueError(f"Existing {design_path} does not match this reproducible Sobol design.")
-        else:
-            np.save(design_path, points)
         label_path = system_dir / "odf_labels.npz"
-        _write_system_label_table(label_path, points, space, design_metadata)
+        stored_design = _load_stored_design(
+            design_path, label_path,
+            num_samples=num_samples, dimension=space.dimension,
+            component_count=space.max_components,
+        )
+        if stored_design is not None:
+            points, design_metadata = stored_design
+            print(f"[progress] reusing persisted ODF design for {name} ({num_samples} labels)",
+                  flush=True)
+        else:
+            print(f"[progress] building ODF design for {name} ({num_samples} labels)",
+                  flush=True)
+            with _progress_heartbeat(f"initializing ODF design for {name}", progress_interval):
+                points, design_metadata = _build_design(
+                    num_samples, space,
+                    seed=(design_seed if paired_design else int(np.random.SeedSequence(
+                        design_seed, spawn_key=(system_index,)
+                    ).generate_state(1)[0])),
+                    run=run, system=system,
+                )
+            if design_path.exists():
+                existing_design = np.load(design_path)
+                if existing_design.shape != points.shape or not np.array_equal(existing_design, points):
+                    raise ValueError(f"Existing {design_path} does not match this reproducible Sobol design.")
+            else:
+                np.save(design_path, points)
+            print(f"[progress] writing ODF labels for {name}", flush=True)
+            with _progress_heartbeat(f"writing ODF labels for {name}", progress_interval):
+                _write_system_label_table(label_path, points, space, design_metadata)
         grid = None
         if include_grid:
             grid_path = system_dir / "odf_grid_quaternions.npy"
@@ -778,16 +955,29 @@ def generate(spec: dict, *, limit: int | None = None, resume: bool = True,
             else:
                 grid = sobol_odf_grid(
                     grid_points,
-                    seed=int(np.random.SeedSequence(design_seed, spawn_key=(system_index, 999)).generate_state(1)[0]),
+                    seed=(design_seed + 999 if paired_design else int(np.random.SeedSequence(
+                        design_seed, spawn_key=(system_index, 999)
+                    ).generate_state(1)[0])),
                 )
                 np.save(grid_path, grid.astype(np.float32))
         systems_data.append({
             "system": system, "name": name, "symmetry": symmetry, "space": space,
             "system_dir": system_dir, "points": points, "grid": grid,
             "label_path": label_path, "design_metadata": design_metadata,
+            "directional_targets": directional_settings,
+            "paired_design": paired_design,
         })
-    _write_scan_index(output_root, systems_data, counts, image_format)
-    _write_hdf5_metadata(output_root, spec, systems_data)
+    print("[progress] writing planned scan index", flush=True)
+    with _progress_heartbeat("writing planned scan index", progress_interval):
+        _write_scan_index(output_root, systems_data, counts, image_format)
+    if run.get("write_hdf5_metadata", False):
+        print("[progress] writing HDF5 metadata", flush=True)
+        with _progress_heartbeat("writing HDF5 metadata", progress_interval):
+            _write_hdf5_metadata(output_root, spec, systems_data)
+    print(
+        f"[progress] initialization complete in {time.monotonic() - initialization_started:.1f}s",
+        flush=True,
+    )
 
     generated = 0
     attempted_start = time.monotonic()
@@ -818,6 +1008,8 @@ def generate(spec: dict, *, limit: int | None = None, resume: bool = True,
                     sample_dir = system_dir / run_id
                     record = {
                         "run_id": run_id, "odf_id": odf_id,
+                        "design_pair_id": (f"paired_sobol_{sample_index:06d}"
+                                           if paired_design else odf_id),
                         "odf_label_index": sample_index,
                         "system": system["name"], "orientation_symmetry": symmetry,
                         "sample_index": sample_index, "observation_index": observation_index,
@@ -830,7 +1022,9 @@ def generate(spec: dict, *, limit: int | None = None, resume: bool = True,
                         sample_dir.mkdir(parents=True, exist_ok=True)
                         seed = int(np.random.SeedSequence(
                             observation_seed,
-                            spawn_key=(system_index, sample_index, observation_index),
+                            spawn_key=((sample_index, observation_index)
+                                       if paired_observations else
+                                       (system_index, sample_index, observation_index)),
                         ).generate_state(1)[0])
                         config = _merge(spec["base_config"], system.get("simulation", {}))
                         config["texture"] = odf.to_dict()
@@ -856,6 +1050,20 @@ def generate(spec: dict, *, limit: int | None = None, resume: bool = True,
                             grain_count=count, observation_seed=seed,
                             design_metadata=sample_design_metadata,
                         )
+                        directional_settings = item["directional_targets"]
+                        if directional_settings is not None:
+                            target_path = sample_dir / directional_settings["filename"]
+                            experiment = config["experiment"]
+                            write_directional_targets(
+                                target_path,
+                                result["orientations"],
+                                crystal_symmetry=symmetry,
+                                pole_families=directional_settings["pole_families"],
+                                sample_directions=directional_settings["sample_directions"],
+                                grid_size=directional_settings["grid_size"],
+                                coefficient_shape=directional_settings["coefficient_shape"],
+                                unit_cell=experiment.get("unit_cell"),
+                            )
                         record.update({
                             "status": "complete", "seed": seed, "path": str(sample_dir),
                             "odf": odf.to_dict(), "num_grains": result["num_grains"],
@@ -877,6 +1085,8 @@ def generate(spec: dict, *, limit: int | None = None, resume: bool = True,
                             ),
                             "component_active_mask": sample_design_metadata["component_active_mask"],
                         })
+                        if directional_settings is not None:
+                            record["pf_ipf_targets"] = str(target_path)
                         if write_tiff:
                             tiff_path = sample_dir / "simulation_pattern.tiff"
                             _write_tiff(result["image"], tiff_path, result["metadata"])
@@ -916,12 +1126,54 @@ def main() -> None:
     parser.add_argument("--progress-interval", type=float, default=30.0,
                         help="seconds between liveness updates during each simulation (default: 30)")
     parser.add_argument("--dry-run", action="store_true", help="report planned count only")
+    parser.add_argument("--previews-only", action="store_true",
+                        help="backfill missing PNG previews from completed manifest records")
+    parser.add_argument("--refresh-previews", action="store_true",
+                        help="rebuild existing PNG previews when used with --previews-only")
+    parser.add_argument("--system", action="append",
+                        help="generate only this configured crystal-system name; repeat for a subset")
+    parser.add_argument("--samples-per-symmetry", type=int,
+                        help="override the configured ODF count per selected system")
+    parser.add_argument("--output-directory", type=Path,
+                        help="override run.output_directory (required for a production subset/size override)")
     args = parser.parse_args()
     spec = json.loads(args.spec.read_text())
+    if args.system:
+        requested = set(args.system)
+        known = {system["name"] for system in spec["crystal_systems"]}
+        unknown = requested.difference(known)
+        if unknown:
+            parser.error(f"unknown --system values: {sorted(unknown)}; choose from {sorted(known)}")
+        spec["crystal_systems"] = [
+            system for system in spec["crystal_systems"] if system["name"] in requested
+        ]
+    if args.samples_per_symmetry is not None:
+        if args.samples_per_symmetry < 1:
+            parser.error("--samples-per-symmetry must be positive")
+        spec["run"]["num_samples_per_symmetry"] = args.samples_per_symmetry
+    if args.output_directory is not None:
+        spec["run"]["output_directory"] = str(args.output_directory)
+    if ((args.system or args.samples_per_symmetry is not None)
+            and args.output_directory is None and not args.dry_run):
+        parser.error("subset/size generation requires --output-directory to protect the full corpus")
     if args.dry_run:
         print(f"Planned ODF points: {planned_odf_points(spec)}")
         print(f"Grain counts per ODF: {list(grain_counts(spec))}")
         print(f"Planned simulations: {planned_runs(spec)}")
+        return
+    if args.previews_only:
+        run = spec["run"]
+        output_root = Path(run["output_directory"])
+        manifest_name = run.get("manifest", "manifest.jsonl")
+        manifest_paths = [output_root / manifest_name]
+        manifest_paths.extend(output_root.glob(
+            f"{Path(manifest_name).stem}.shard_*{Path(manifest_name).suffix or '.jsonl'}"
+        ))
+        created = sum(
+            _sync_png_previews(output_root, run, manifest, overwrite=args.refresh_previews)
+            for manifest in manifest_paths
+        )
+        print(f"Backfilled {created} PNG previews.")
         return
     generated = generate(spec, limit=args.limit, resume=not args.no_resume,
                          shard_index=args.shard_index, num_shards=args.num_shards,

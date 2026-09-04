@@ -1,0 +1,127 @@
+{
+  "run": {
+    "output_directory": "datasets/balanced_symmetry_odf_pf_v1",
+    "manifest": "manifest.jsonl",
+    "design_seed": 20260921,
+    "observation_seed": 20260922,
+    "num_samples_per_symmetry": 25000,
+    "recommended_learning_curve_odfs_per_symmetry": [10000, 25000],
+    "sampling_method": "Sobol_sequence",
+    "paired_design_across_systems": true,
+    "paired_observation_noise_across_systems": true,
+    "kernel_type": "de_la_vallee_poussin",
+    "max_texture_components": 5,
+    "grain_counts": [6000],
+    "output_format": "parameters_only",
+    "isotropic_background_range": [0.0, 0.95],
+    "dirichlet_concentration_range": [0.1, 4.0],
+    "spread_range_degrees": [3.0, 45.0],
+    "spread_scale": "log",
+    "directional_targets": {
+      "enabled": true,
+      "source": "observation_orientations",
+      "grid_size": 32,
+      "coefficient_shape": [9, 9],
+      "sample_directions": [
+        {"name": "RD", "direction": [1, 0, 0]},
+        {"name": "TD", "direction": [0, 1, 0]},
+        {"name": "ND", "direction": [0, 0, 1]}
+      ]
+    },
+    "write_tiff": false,
+    "write_png_previews": true,
+    "png_preview_directory": "png_preview",
+    "png_saturation_percentile": 99.5,
+    "write_hdf5_metadata": true
+  },
+  "base_config": {
+    "experiment": {
+      "wavelength": 0.0514,
+      "incident_convergence_full_angle_mrad": 3.5,
+      "num_grains": 6000,
+      "max_hkl_index": 4
+    },
+    "grain": {
+      "size_mean": 30.438705852742045,
+      "size_std": 5.224553989649754,
+      "size_unit": "um",
+      "size_distribution": "lognormal",
+      "strain_mean": 0.0,
+      "strain_std": 0.0001,
+      "aspect_ratio": 1.5
+    },
+    "detector": {
+      "width_px": 1028,
+      "height_px": 1062,
+      "distance_mm": 86.0,
+      "pixel_size_mm": 0.075,
+      "ewald_tolerance": 0.1,
+      "bin_to_width_px": 256,
+      "bin_to_height_px": 256,
+      "central_beam_blocker_fwhm_px": 5.0
+    },
+    "output": {
+      "store_grains": false,
+      "store_peaks": false,
+      "image_format": "npy"
+    }
+  },
+  "crystal_systems": [
+    {
+      "name": "fcc_cu_balanced",
+      "orientation_symmetry": "cubic",
+      "pole_families": [
+        {"name": "{111}", "hkl": [1, 1, 1]},
+        {"name": "{200}", "hkl": [2, 0, 0]},
+        {"name": "{220}", "hkl": [2, 2, 0]}
+      ],
+      "simulation": {
+        "experiment": {
+          "material": "Cu",
+          "crystal_structure": "FCC",
+          "lattice_parameter": 0.361
+        }
+      }
+    },
+    {
+      "name": "bcc_fe_balanced",
+      "orientation_symmetry": "cubic",
+      "pole_families": [
+        {"name": "{110}", "hkl": [1, 1, 0]},
+        {"name": "{200}", "hkl": [2, 0, 0]},
+        {"name": "{211}", "hkl": [2, 1, 1]}
+      ],
+      "simulation": {
+        "experiment": {
+          "material": "Fe",
+          "crystal_structure": "BCC",
+          "lattice_parameter": 0.2866
+        }
+      }
+    },
+    {
+      "name": "hcp_ti_balanced",
+      "orientation_symmetry": "hexagonal",
+      "pole_families": [
+        {"name": "{0002}", "hkl": [0, 0, 2]},
+        {"name": "{10-10}", "hkl": [1, 0, 0]},
+        {"name": "{10-11}", "hkl": [1, 0, 1]}
+      ],
+      "simulation": {
+        "experiment": {
+          "material": "Ti",
+          "crystal_structure": "HCP",
+          "lattice_parameter": 0.295,
+          "unit_cell": {
+            "a": 0.295,
+            "b": 0.295,
+            "c": 0.4683,
+            "alpha_deg": 90.0,
+            "beta_deg": 90.0,
+            "gamma_deg": 120.0
+          }
+        }
+      }
+    }
+  ]
+}

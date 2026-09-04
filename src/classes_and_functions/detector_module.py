@@ -12,7 +12,7 @@ class Detector:
                  detector_distance, structure_factor_func, shape_factor=.9,
                  instrumental_fwhm_px=4.709640090061899, intensity_scale=1.0,
                  pixel_size_grain_units=None, profile="voigt",
-                 lorentz_model="none"):
+                 lorentz_model="none", incident_convergence_full_angle_mrad=0.0):
         self.ewald_sphere, self.experiment = ewald_sphere, experiment
         self.detector_width, self.detector_height = detector_width, detector_height
         self.detector_distance = detector_distance
@@ -23,6 +23,7 @@ class Detector:
         self.pixel_size_grain_units = pixel_size_grain_units
         self.profile = profile
         self.lorentz_model = lorentz_model
+        self.incident_convergence_full_angle_mrad = incident_convergence_full_angle_mrad
 
     def _deposit_peak(self, image, row, col, radial, intensity, properties):
         """Deposit a radial Voigt × tangential Gaussian without edge renormalization."""
@@ -120,6 +121,9 @@ class Detector:
                 pixel_size=self.pixel_size_grain_units,
                 excitation_error=excitation_error,
                 lorentz_model=self.lorentz_model,
+                incident_convergence_full_angle_mrad=(
+                    self.incident_convergence_full_angle_mrad
+                ),
             )
             hkl = tuple(map(int, point[3:6])) if len(point) >= 6 else None
             structure_intensity = (1.0 if self.structure_factor_func is None
@@ -146,6 +150,9 @@ class Detector:
                     "grain_volume_um3": properties.volume_um3,
                     "excitation_error": properties.excitation_error,
                     "excitation_weight": properties.excitation_weight,
+                    "convergence_reciprocal_half_span": (
+                        properties.convergence_reciprocal_half_span
+                    ),
                 })
         return {
             "coordinate": np.asarray(coordinates),

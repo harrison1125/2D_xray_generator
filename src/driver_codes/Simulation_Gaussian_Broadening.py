@@ -122,7 +122,10 @@ def run_experiment(config, *, save=True, odf=None):
     size_to_nm = SIZE_UNIT_TO_NM[grain_cfg["size_unit"]]
     size_mean_nm = grain_cfg["size_mean"] * size_to_nm
     size_std_nm = grain_cfg["size_std"] * size_to_nm
-    if structure in {"MONOCLINIC", "TRICLINIC"}:
+    # Any explicitly supplied cell uses the general reciprocal metric.  This
+    # is essential for HCP, where c/a and gamma=120 degrees cannot be
+    # represented by GrainCubic's single lattice parameter.
+    if exp_cfg["unit_cell"] is not None:
         cell = exp_cfg["unit_cell"]
         grain = GrainGeneral(size_mean_nm, size_std_nm**2,
                              grain_cfg["strain_mean"], grain_cfg["strain_std"]**2,
@@ -161,7 +164,10 @@ def run_experiment(config, *, save=True, odf=None):
                             intensity_scale=scattering["intensity_scale"],
                             pixel_size_grain_units=det_cfg["pixel_size_mm"] * 1e6,
                             profile=scattering["profile"],
-                            lorentz_model=scattering["lorentz_model"])
+                            lorentz_model=scattering["lorentz_model"],
+                            incident_convergence_full_angle_mrad=exp_cfg[
+                                "incident_convergence_full_angle_mrad"
+                            ])
         projection = detector.project_points(image=image, store_peaks=store_peaks)
         peak_count += projection["num_peaks"]
         if store_peaks:
@@ -179,6 +185,7 @@ def run_experiment(config, *, save=True, odf=None):
               "num_grains": int(exp_cfg["num_grains"]), "num_peaks": peak_count,
               "metadata": {"configuration": config, "texture": texture_metadata,
                            "odf_class": type(odf).__name__,
+                           "grain_lattice_model": type(grain).__name__,
                            "detector_readout": _detector_readout_metadata(
                                det_cfg, scattering, image.shape)}}
     if save: result["files"] = _save_result(result, config)

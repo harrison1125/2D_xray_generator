@@ -28,8 +28,9 @@ xrd-generate configs/fcc_texture_grain_example.json
 Configuration sections:
 
 - `experiment`: material label, crystal structure, lattice parameter,
-  wavelength, grain count, random seed, and the currently supported `nm`
-  lattice/wavelength unit.
+  wavelength, grain count, random seed, full incident convergence angle in
+  mrad, and the currently supported `nm` lattice/wavelength unit. A configured
+  value of `3.5` integrates a uniform incident distribution over ±1.75 mrad.
 - `grain`: equivalent-volume size mean/standard deviation, explicit `nm` or
   `um` size unit, positive size distribution (`lognormal` by default),
   microstrain mean/standard deviation, and ellipsoid aspect ratio. The driver
@@ -51,10 +52,10 @@ Configuration sections:
 - `output`: result directory and filename prefix.
 
 `experiment.crystal_structure` supports `SC`, `FCC`, `BCC`, `HCP`,
-`MONOCLINIC`, and `TRICLINIC`. The low-symmetry paths require an explicit
-`unit_cell` object with `a`, `b`, `c`, `alpha_deg`, `beta_deg`, and `gamma_deg`;
-they use `GrainGeneral` rather than the cubic reciprocal lattice. Use
-`max_hkl_index` to control reciprocal-lattice truncation. `output.store_grains`
+`MONOCLINIC`, and `TRICLINIC`. HCP and the low-symmetry paths require an
+explicit `unit_cell` object with `a`, `b`, `c`, `alpha_deg`, `beta_deg`, and
+`gamma_deg`; they use `GrainGeneral` rather than the cubic reciprocal lattice.
+Use `max_hkl_index` to control reciprocal-lattice truncation. `output.store_grains`
 and `output.store_peaks` may be set false for large batch datasets where exact
 ODF parameters are retained separately.
 

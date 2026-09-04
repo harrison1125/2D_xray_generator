@@ -1,77 +1,40 @@
 {
   "run": {
-    "output_directory": "datasets/continuous_odf_sputter_pvd_broad_v1",
+    "output_directory": "datasets/continuous_odf_phase_space_v2",
     "manifest": "manifest.jsonl",
-    "design_seed": 20261010,
-    "observation_seed": 20261011,
-    "num_samples_per_symmetry": 10000,
-    "sampling_method": "physical_sobol_manifold",
+    "design_seed": 20260911,
+    "observation_seed": 20260912,
+    "num_samples_per_symmetry": 50000,
+    "sampling_method": "Sobol_sequence",
     "kernel_type": "de_la_vallee_poussin",
-    "max_texture_components": 6,
+    "max_texture_components": 5,
     "grain_counts": [
       6000
     ],
     "output_format": "parameters_only",
-    "write_tiff": true,
+    "harmonic_bandlimit": 6,
+    "odf_grid_points": 1024,
+    "isotropic_background_range": [
+      0.05,
+      0.95
+    ],
+    "dirichlet_concentration_range": [
+      0.2,
+      4.0
+    ],
+    "spread_range_degrees": [
+      2.5,
+      30.0
+    ],
+    "spread_scale": "linear",
     "write_png_previews": true,
     "png_preview_directory": "png_preview",
-    "png_saturation_percentile": 99.5,
-    "write_hdf5_metadata": true,
-    "physical_texture": {
-      "inference_mode": "broad_likelihood",
-      "process_family": "sputter_pvd",
-      "uniform_center_fraction": 0.15,
-      "component_count_range": [
-        1,
-        6
-      ],
-      "fwhm_strata_degrees": [
-        [
-          5.0,
-          10.0
-        ],
-        [
-          10.0,
-          20.0
-        ],
-        [
-          20.0,
-          30.0
-        ]
-      ],
-      "fwhm_strata_probabilities": [
-        0.3,
-        0.4,
-        0.3
-      ],
-      "background_range": [
-        0.0,
-        0.96
-      ],
-      "background_beta": [
-        1.0,
-        1.0
-      ],
-      "dirichlet_concentration_range": [
-        1.0,
-        1.0
-      ],
-      "component_center_fwhm_deg": 3.0,
-      "fiber_concentration": 75.0,
-      "fiber_tube_fwhm_deg": 10.0,
-      "texture_index_policy": "soft_weight",
-      "texture_index_bounds": [
-        1.0,
-        1000000.0
-      ],
-      "texture_index_softness": 1000000.0,
-      "texture_index_log_weight_floor": -1.0
-    }
+    "png_saturation_percentile": 99.5
   },
   "base_config": {
     "experiment": {
       "wavelength": 0.0514,
-      "num_grains": 6000,
+      "num_grains": 1990,
       "max_hkl_index": 4
     },
     "grain": {
@@ -102,11 +65,8 @@
   },
   "crystal_systems": [
     {
-      "name": "fcc_cu_sputter_pvd",
+      "name": "cubic_fcc",
       "orientation_symmetry": "cubic",
-      "physical_texture": {
-        "pvd_crystal_family": "fcc"
-      },
       "simulation": {
         "experiment": {
           "material": "Cu",
@@ -116,11 +76,8 @@
       }
     },
     {
-      "name": "bcc_fe_sputter_pvd",
+      "name": "cubic_bcc",
       "orientation_symmetry": "cubic",
-      "physical_texture": {
-        "pvd_crystal_family": "bcc"
-      },
       "simulation": {
         "experiment": {
           "material": "Fe",
@@ -130,11 +87,8 @@
       }
     },
     {
-      "name": "hcp_ti_sputter_pvd",
+      "name": "hexagonal_hcp",
       "orientation_symmetry": "hexagonal",
-      "physical_texture": {
-        "pvd_crystal_family": "hcp"
-      },
       "simulation": {
         "experiment": {
           "material": "Ti",

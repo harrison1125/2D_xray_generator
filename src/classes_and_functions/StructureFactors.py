@@ -13,6 +13,8 @@ Returns:
 float
     Structure factor F(h,k,l) for the given reflection.
 """
+import cmath
+import math
 
 
 # Simple Cubic (SC)
@@ -40,10 +42,15 @@ def structure_factor_diamond(h, k, l, f):
 
 # Hexagonal Close-Packed (HCP)
 def structure_factor_hcp(h, k, l, f):
-    if (h + 2*k) % 3 == 0:  # Condition for allowed reflections
-        return f * (1 + (-1)**l * complex(0, -1)**l)
-    else:
-        return 0
+    """Ideal monatomic HCP basis at (0,0,0) and (2/3,1/3,1/2).
+
+    Returning the complex amplitude lets the detector form ``abs(F)**2``.
+    In particular, this retains the physically important 002 reflection and
+    applies the basis interference continuously instead of an incorrect
+    all-or-nothing modular filter.
+    """
+    phase_cycles = (2 * h + k) / 3 + l / 2
+    return f * (1 + cmath.exp(2j * math.pi * phase_cycles))
 
 # Body-Centered Tetragonal (BCT)
 def structure_factor_bct(h, k, l, f):

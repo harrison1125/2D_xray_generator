@@ -11,6 +11,7 @@ DEFAULT_CONFIG = {
         "material": "Cu", "crystal_structure": "FCC", "lattice_parameter": 0.361,
         "unit_cell": None, "max_hkl_index": 4, "length_unit": "nm",
         "wavelength": 0.0514, "num_grains": 100, "seed": 12345,
+        "incident_convergence_full_angle_mrad": 0.0,
     },
     "grain": {
         "size_mean": 33500.0, "size_std": 5750.0,
@@ -60,15 +61,19 @@ def validate_config(config):
         raise ValueError("experiment.crystal_structure must be SC, FCC, BCC, HCP, MONOCLINIC, or TRICLINIC.")
     if experiment["num_grains"] < 1 or experiment["wavelength"] <= 0 or experiment["lattice_parameter"] <= 0:
         raise ValueError("num_grains, wavelength, and lattice_parameter must be positive.")
+    if experiment["incident_convergence_full_angle_mrad"] < 0:
+        raise ValueError("incident_convergence_full_angle_mrad must be nonnegative.")
     if experiment["length_unit"] != "nm":
         raise ValueError("experiment.length_unit currently supports only 'nm'.")
     if not isinstance(experiment["max_hkl_index"], int) or experiment["max_hkl_index"] < 1:
         raise ValueError("experiment.max_hkl_index must be a positive integer.")
     unit_cell = experiment["unit_cell"]
-    if structure in {"MONOCLINIC", "TRICLINIC"}:
+    if structure in {"HCP", "MONOCLINIC", "TRICLINIC"} and unit_cell is None:
+        raise ValueError("HCP/MONOCLINIC/TRICLINIC experiments require an explicit unit_cell.")
+    if unit_cell is not None:
         required = {"a", "b", "c", "alpha_deg", "beta_deg", "gamma_deg"}
         if not isinstance(unit_cell, dict) or set(unit_cell) != required:
-            raise ValueError("MONOCLINIC/TRICLINIC experiments require unit_cell with a, b, c, alpha_deg, beta_deg, gamma_deg.")
+            raise ValueError("unit_cell must contain a, b, c, alpha_deg, beta_deg, gamma_deg.")
         if any(float(unit_cell[key]) <= 0 for key in ("a", "b", "c")):
             raise ValueError("unit_cell lengths must be positive.")
         if any(not 0 < float(unit_cell[key]) < 180 for key in ("alpha_deg", "beta_deg", "gamma_deg")):
@@ -83,6 +88,15 @@ def validate_config(config):
         raise ValueError("Detector dimensions, distance, and pixel size must be positive.")
     if detector["ewald_tolerance"] <= 0:
         raise ValueError("detector.ewald_tolerance must be a positive candidate-window width.")
+    convergence_shell_bound = (
+        0.5 * experiment["incident_convergence_full_angle_mrad"] * 1e-3
+        / experiment["wavelength"]
+    )
+    if detector["ewald_tolerance"] < convergence_shell_bound:
+        raise ValueError(
+            "detector.ewald_tolerance is too small to contain the configured "
+            "incident-convergence Ewald-shell displacement."
+        )
     bin_width, bin_height = detector["bin_to_width_px"], detector["bin_to_height_px"]
     if (bin_width is None) != (bin_height is None):
         raise ValueError("bin_to_width_px and bin_to_height_px must both be set or both be null.")

@@ -69,6 +69,19 @@ the old flat behavior where every point inside a wide `0.1 nm^-1` shell was
 equally “on Bragg.” The candidate window still must be wide enough for the
 smallest crystallites being simulated.
 
+When `experiment.incident_convergence_full_angle_mrad` is nonzero, this
+finite-size Lorentzian is averaged over a uniform one-dimensional incident-ray
+distribution in the reflection scattering plane. A value of `3.5` therefore
+integrates from -1.75 to +1.75 mrad. For reciprocal FWHM `Gamma`, full angle
+`2 alpha`, and `A = sin(2theta) / lambda`, the normalized excitation weight is
+
+`Gamma / (4 A alpha) * [atan(2(s + A alpha)/Gamma) - atan(2(s - A alpha)/Gamma)]`.
+
+The angular average conserves fixed total incident flux: it redistributes
+intensity from a few exact-Bragg grains to the many grains whose rocking curves
+intersect the convergence interval. This is a uniform 1-D scattering-plane
+approximation, not a coherent wave-optics model of an axisymmetric cone.
+
 ## Spot-width calculation
 
 For each reciprocal vector, the coherent length `L` is the central ellipsoid

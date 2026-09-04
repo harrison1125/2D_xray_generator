@@ -88,6 +88,46 @@ class PeakProperties:
     projected_sigma_tangential_px: float
     excitation_error: float
     excitation_weight: float
+    convergence_reciprocal_half_span: float
+
+
+def convergence_averaged_excitation_weight(
+    excitation_error: float,
+    reciprocal_fwhm: float,
+    two_theta: float,
+    wavelength: float,
+    full_convergence_angle_mrad: float = 0.0,
+) -> tuple[float, float]:
+    """Average a finite-size rocking curve over uniform incident-ray angles.
+
+    The configured value is the full range, so 3.5 mrad integrates uniformly
+    from -1.75 to +1.75 mrad in the reflection's scattering plane. For a small
+    incident-ray tilt ``delta``, the radial Ewald mismatch changes by
+    ``sin(2 theta) * delta / wavelength``. The normalized analytic integral
+    conserves fixed total incident flux. Zero convergence exactly recovers the
+    original finite-size-only Lorentzian excitation weight.
+    """
+    error = abs(float(excitation_error))
+    width = float(reciprocal_fwhm)
+    full_angle = float(full_convergence_angle_mrad)
+    if width <= 0 or wavelength <= 0 or full_angle < 0:
+        raise ValueError(
+            "Reciprocal width/wavelength must be positive and convergence nonnegative."
+        )
+    point_weight = 1.0 / (1.0 + (2.0 * error / width) ** 2)
+    if full_angle == 0:
+        return float(point_weight), 0.0
+
+    half_angle_rad = 0.5 * full_angle * 1e-3
+    slope = abs(np.sin(two_theta)) / wavelength
+    half_span = slope * half_angle_rad
+    if half_span <= np.finfo(float).eps:
+        return float(point_weight), float(half_span)
+
+    upper = 2.0 * (error + half_span) / width
+    lower = 2.0 * (error - half_span) / width
+    averaged = width * (np.arctan(upper) - np.arctan(lower)) / (4.0 * half_span)
+    return float(np.clip(averaged, 0.0, 1.0)), float(half_span)
 
 
 def peak_properties(grain, reciprocal_vector_sample, two_theta, wavelength,
@@ -95,7 +135,8 @@ def peak_properties(grain, reciprocal_vector_sample, two_theta, wavelength,
                     instrumental_fwhm_px=4.709640090061899,
                     intensity_scale=1.0, outgoing_direction=None,
                     radial_direction=None, pixel_size=None,
-                    excitation_error=0.0, lorentz_model="none") -> PeakProperties:
+                    excitation_error=0.0, lorentz_model="none",
+                    incident_convergence_full_angle_mrad=0.0) -> PeakProperties:
     """Compute per-reflection width and integrated intensity.
 
     Size broadening is the Lorentzian Scherrer FWHM ``K λ/(L cos θ)``.
@@ -106,8 +147,10 @@ def peak_properties(grain, reciprocal_vector_sample, two_theta, wavelength,
     Integrated intensity is relative (absolute beam flux and detector response
     are not modeled), but scales with illuminated grain volume in µm³. A
     Lorentzian excitation-error weight makes finite grain size affect whether a
-    reciprocal point contributes in a static shot. ``lorentz_model='legacy'``
-    retains the old scan-like ``1/sin(2theta)`` factor for comparisons only.
+    reciprocal point contributes in a static shot. When convergence is
+    configured, that rocking curve is averaged over the incident angular
+    interval. ``lorentz_model='legacy'`` retains the old scan-like
+    ``1/sin(2theta)`` factor for comparisons only.
     """
     theta = 0.5 * two_theta
     length = coherent_length(grain, reciprocal_vector_sample)
@@ -146,7 +189,13 @@ def peak_properties(grain, reciprocal_vector_sample, two_theta, wavelength,
     length_to_microns = getattr(grain, "length_to_microns", 1e-3)
     volume_um3 = ellipsoid_volume(grain.grain_size * length_to_microns)
     reciprocal_fwhm = shape_factor / max(length, np.finfo(float).eps)
-    excitation_weight = 1.0 / (1.0 + (2.0 * abs(excitation_error) / reciprocal_fwhm)**2)
+    excitation_weight, convergence_half_span = convergence_averaged_excitation_weight(
+        excitation_error,
+        reciprocal_fwhm,
+        two_theta,
+        wavelength,
+        incident_convergence_full_angle_mrad,
+    )
     if lorentz_model == "none":
         lorentz = 1.0
     elif lorentz_model == "legacy":
@@ -161,5 +210,5 @@ def peak_properties(grain, reciprocal_vector_sample, two_theta, wavelength,
         float(strain_fwhm), float(size_fwhm_px), float(radial_gaussian_sigma),
         float(tangential_gaussian_sigma), float(projected_radial_sigma),
         float(projected_tangential_sigma), float(excitation_error),
-        float(excitation_weight),
+        float(excitation_weight), float(convergence_half_span),
     )

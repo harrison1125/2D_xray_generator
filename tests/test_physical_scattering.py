@@ -6,11 +6,16 @@ from tempfile import TemporaryDirectory
 import numpy as np
 from PIL import Image
 
+from src.classes_and_functions import StructureFactors
 from src.classes_and_functions.crystal import GrainCubic
+from src.classes_and_functions.directional_targets import (
+    build_directional_targets, reciprocal_plane_normal,
+)
 from src.classes_and_functions.detector_module import Detector
 from src.classes_and_functions.experiment import Experiment
 from src.classes_and_functions.grain_scattering import (
-    ellipsoid_volume, peak_properties, projected_ellipsoid_covariance_px,
+    convergence_averaged_excitation_weight, ellipsoid_volume, peak_properties,
+    projected_ellipsoid_covariance_px,
 )
 from src.driver_codes.Simulation_Gaussian_Broadening import (
     _area_bin_image, run_experiment,
@@ -90,6 +95,43 @@ class TestPhysicalScattering(unittest.TestCase):
         expected_scherrer = 0.9 * 0.0514 / (33_500.0 * np.cos(0.15))
         self.assertAlmostEqual(properties.size_fwhm_2theta_rad, expected_scherrer)
 
+    def test_uniform_convergence_integral_matches_numerical_quadrature(self):
+        error = 0.01
+        reciprocal_fwhm = 3.0e-5
+        two_theta = 0.3
+        wavelength = 0.0514
+        full_angle_mrad = 3.5
+        weight, half_span = convergence_averaged_excitation_weight(
+            error, reciprocal_fwhm, two_theta, wavelength, full_angle_mrad
+        )
+        half_angle = 0.5 * full_angle_mrad * 1e-3
+        slope = abs(np.sin(two_theta)) / wavelength
+        angles = np.linspace(-half_angle, half_angle, 1_000_001)
+        numerical = np.trapezoid(
+            1.0 / (1.0 + (2.0 * (error + slope * angles) / reciprocal_fwhm) ** 2),
+            angles,
+        ) / (2.0 * half_angle)
+        point_weight, zero_span = convergence_averaged_excitation_weight(
+            error, reciprocal_fwhm, two_theta, wavelength, 0.0
+        )
+        expected_point = 1.0 / (1.0 + (2.0 * error / reciprocal_fwhm) ** 2)
+        self.assertAlmostEqual(weight, numerical, places=10)
+        self.assertAlmostEqual(half_span, slope * half_angle)
+        self.assertAlmostEqual(point_weight, expected_point)
+        self.assertEqual(zero_span, 0.0)
+        self.assertGreater(weight, 100.0 * point_weight)
+
+    def test_peak_properties_records_configured_convergence_span(self):
+        grain = GrainCubic(30_000.0, 0.0, 0.0, 0.0, 1.0, 0.361,
+                           Experiment(0.0514, "Cu"), length_to_microns=1e-3)
+        properties = peak_properties(
+            grain, [1, 1, 1], 0.3, 0.0514, 1000.0,
+            excitation_error=0.01,
+            incident_convergence_full_angle_mrad=3.5,
+        )
+        self.assertGreater(properties.convergence_reciprocal_half_span, 0.0)
+        self.assertGreater(properties.excitation_weight, 0.0)
+
     def test_projected_sphere_uses_physical_pixel_pitch(self):
         grain = GrainCubic(33_500.0, 0.0, 0.0, 0.0, 1.0, 0.361,
                            Experiment(0.0514, "Cu"))
@@ -162,6 +204,13 @@ class TestPhysicalScattering(unittest.TestCase):
                     "max_texture_components": 5,
                     "output_format": "parameters_only",
                     "write_tiff": False,
+                    "directional_targets": {
+                        "enabled": True,
+                        "source": "observation_orientations",
+                        "grid_size": 8,
+                        "coefficient_shape": [2, 2],
+                        "sample_directions": [{"name": "ND", "direction": [0, 0, 1]}],
+                    },
                 },
                 "base_config": {
                     "experiment": {"num_grains": 1, "max_hkl_index": 1},
@@ -173,6 +222,7 @@ class TestPhysicalScattering(unittest.TestCase):
                 },
                 "crystal_systems": [{
                     "name": "cubic_fcc", "orientation_symmetry": "cubic",
+                    "pole_families": [{"name": "{111}", "hkl": [1, 1, 1]}],
                     "simulation": {"experiment": {
                         "material": "Cu", "crystal_structure": "FCC",
                         "lattice_parameter": 0.361,
@@ -195,15 +245,74 @@ class TestPhysicalScattering(unittest.TestCase):
                 self.assertTrue(np.array_equal(index["grain_count"], [1, 2, 1, 2]))
                 self.assertTrue(np.array_equal(index["odf_descriptor"][0],
                                                index["odf_descriptor"][1]))
+                self.assertIn("pf_ipf_path", index)
+                self.assertIn("design_pair_id", index)
             label_paths = sorted((output / "cubic_fcc").glob("*g00000*/odf_label.npz"))
             self.assertEqual(len(label_paths), 4)
             with np.load(label_paths[0]) as label:
                 self.assertTrue(np.array_equal(label["descriptor"], first_descriptor))
                 self.assertEqual(str(label["label_version"]),
                                  "continuous_symmetric_dvp_mixture_v1")
+            directional_paths = sorted(
+                (output / "cubic_fcc").glob("*g00000*/pf_ipf_targets.npz")
+            )
+            self.assertEqual(len(directional_paths), 4)
+            with np.load(directional_paths[0]) as targets:
+                self.assertEqual(targets["directional_coefficients"].shape, (2, 4))
+                self.assertTrue(np.allclose(
+                    targets["pole_figure_probability_mass"].sum(axis=(1, 2)), 1.0
+                ))
+                self.assertTrue(np.allclose(
+                    targets["inverse_pole_figure_probability_mass"].sum(axis=(1, 2)), 1.0
+                ))
             records = [json.loads(line) for line in (output / "manifest.jsonl").read_text().splitlines()]
             self.assertEqual({record["grain_count"] for record in records}, {1, 2})
             self.assertEqual(len({record["seed"] for record in records}), 4)
+
+    def test_directional_targets_use_reciprocal_hcp_geometry_and_symmetry(self):
+        cell = {
+            "a": 0.295, "b": 0.295, "c": 0.4683,
+            "alpha_deg": 90.0, "beta_deg": 90.0, "gamma_deg": 120.0,
+        }
+        self.assertTrue(np.allclose(reciprocal_plane_normal([0, 0, 2], cell), [0, 0, 1]))
+        identity = np.tile([1.0, 0.0, 0.0, 0.0], (6, 1))
+        targets = build_directional_targets(
+            identity,
+            crystal_symmetry="hexagonal",
+            pole_families=[
+                {"name": "{0002}", "hkl": [0, 0, 2]},
+                {"name": "{10-10}", "hkl": [1, 0, 0]},
+            ],
+            sample_directions=[{"name": "ND", "direction": [0, 0, 1]}],
+            grid_size=16,
+            coefficient_shape=(4, 4),
+            unit_cell=cell,
+        )
+        self.assertEqual(targets["directional_coefficients"].shape, (3, 16))
+        self.assertTrue(np.allclose(
+            targets["pole_figure_probability_mass"].sum(axis=(1, 2)), 1.0
+        ))
+        self.assertTrue(np.allclose(
+            targets["inverse_pole_figure_probability_mass"].sum(axis=(1, 2)), 1.0
+        ))
+
+    def test_hcp_cell_and_basis_are_used_by_simulator(self):
+        cell = {
+            "a": 0.295, "b": 0.295, "c": 0.4683,
+            "alpha_deg": 90.0, "beta_deg": 90.0, "gamma_deg": 120.0,
+        }
+        result = run_experiment({
+            "experiment": {
+                "material": "Ti", "crystal_structure": "HCP",
+                "lattice_parameter": 0.295, "unit_cell": cell,
+                "num_grains": 1, "max_hkl_index": 1,
+            },
+            "detector": {"width_px": 16, "height_px": 16},
+            "output": {"store_grains": False, "store_peaks": False},
+        }, save=False)
+        self.assertEqual(result["metadata"]["grain_lattice_model"], "GrainGeneral")
+        self.assertAlmostEqual(abs(StructureFactors.structure_factor_hcp(0, 0, 1, 1)), 0.0)
+        self.assertAlmostEqual(abs(StructureFactors.structure_factor_hcp(0, 0, 2, 1)), 2.0)
 
     def test_physical_design_supports_soft_likelihood_and_hard_prior_modes(self):
         system = {"name": "cubic", "orientation_symmetry": "cubic"}
